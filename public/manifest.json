@@ -1,0 +1,27 @@
+{
+  "name": "KULMIS ERP",
+  "short_name": "KULMIS",
+  "description": "Modern ERP & POS Platform for African Businesses",
+  "start_url": "/dashboard",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#2563EB",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/api/icon?size=192",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/api/icon?size=512",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["business", "productivity", "finance"],
+  "lang": "en",
+  "prefer_related_applications": false
+}
