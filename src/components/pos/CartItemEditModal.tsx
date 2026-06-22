@@ -80,10 +80,10 @@ export function CartItemEditModal({
         unit_type: u.unit_type ?? {
           id: u.unit_type_id,
           store_id: product.store_id,
-          code: u.unit_type?.code ?? item?.sale_unit_code ?? 'PCS',
-          name: u.unit_type?.name ?? item?.sale_unit_code ?? 'Unit',
+          code: item?.sale_unit_code ?? 'PCS',
+          name: item?.sale_unit_code ?? 'Unit',
           unit_kind: 'base',
-          allows_decimal: u.unit_type?.allows_decimal ?? false,
+          allows_decimal: false,
           sort_order: 0,
           is_active: true,
         },

@@ -11,7 +11,7 @@ import {
 } from '@/components/ui/select';
 import { ExtendSubscriptionDialog } from '@/components/super-admin/ExtendSubscriptionDialog';
 import { StoreGridCard, type StoreGridItem } from '@/components/super-admin/StoreGridCard';
-import { StoreActionsMenu } from '@/components/super-admin/StoreActionsMenu';
+import { StoreActionsMenu, type StoreActionTarget } from '@/components/super-admin/StoreActionsMenu';
 import {
   sa, SaPageHeader, SaPanel, SaViewToggle, SaEmptyState, SaSkeletonGrid,
   SaStatusBadge, SaPlanBadge, StoreAvatar,
@@ -24,7 +24,7 @@ export default function SuperAdminStoresPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [view, setView] = useState<'list' | 'grid'>('grid');
-  const [extendStore, setExtendStore] = useState<StoreGridItem | null>(null);
+  const [extendStore, setExtendStore] = useState<StoreActionTarget | null>(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -205,7 +205,7 @@ export default function SuperAdminStoresPage() {
                       <p className="text-xs text-slate-500 truncate max-w-[140px]">{s.owner_email}</p>
                     </td>
                     <td className="px-4 py-4 text-slate-400 hidden lg:table-cell">{s.country ?? '—'}</td>
-                    <td className="px-4 py-4"><SaPlanBadge plan={s.subscription_plan} /></td>
+                    <td className="px-4 py-4"><SaPlanBadge plan={s.subscription_plan ?? null} /></td>
                     <td className="px-4 py-4"><SaStatusBadge status={s.subscription_status} /></td>
                     <td className="px-4 py-4 text-slate-400 text-xs hidden md:table-cell">
                       {s.subscription_ends_at ? new Date(s.subscription_ends_at).toLocaleDateString() : '—'}

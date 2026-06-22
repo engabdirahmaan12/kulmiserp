@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef } from 'react';
-import { findProductByScan, type BarcodeLookup, type BarcodeScanHit } from './utils';
+import { findProductByScan, BARCODE_MIN_LENGTH, type BarcodeLookup, type BarcodeScanHit } from './utils';
 
 interface UseBarcodeScannerOptions {
   index: BarcodeLookup;

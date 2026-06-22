@@ -5,7 +5,7 @@ import type { PriceTier } from '@/lib/units/conversion';
 import { ensureCartLineKey, recalcCartItem, repriceCartItemForTier } from '@/lib/pos/units';
 import { refreshCartStockLimits } from '@/lib/pos/stock';
 
-interface HeldCart {
+export interface HeldCart {
   id: string;
   name: string;
   items: CartItem[];

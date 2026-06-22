@@ -7,7 +7,7 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle,
 } from '@/components/ui/sheet';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { format } from 'date-fns';
 import Link from 'next/link';
@@ -301,11 +301,12 @@ export function TransactionDetailSheet({ row, open, onClose }: TransactionDetail
 
         <div className="shrink-0 border-t px-5 py-3 flex gap-2">
           {FULL_PAGE[row.tx_type] && (
-            <Button variant="outline" className="flex-1 h-9 gap-1.5" asChild>
-              <Link href={FULL_PAGE[row.tx_type](row.id)}>
-                <ExternalLink className="h-4 w-4" /> Open full page
-              </Link>
-            </Button>
+            <Link
+              href={FULL_PAGE[row.tx_type](row.id)}
+              className={cn(buttonVariants({ variant: 'outline' }), 'flex-1 h-9 gap-1.5')}
+            >
+              <ExternalLink className="h-4 w-4" /> Open full page
+            </Link>
           )}
           <Button variant="ghost" className="flex-1 h-9" onClick={onClose}>Close</Button>
         </div>

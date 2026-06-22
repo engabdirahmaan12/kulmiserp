@@ -72,7 +72,10 @@ async function fetchDashboard(storeId: string) {
       unit: (p.base_unit as { code?: string } | null)?.code ?? p.unit ?? 'PCS',
     }));
 
-  const saleItemRows = saleItems.data || [];
+  const saleItemRows = (saleItems.data || []).map((item) => ({
+    ...item,
+    sale: Array.isArray(item.sale) ? (item.sale[0] ?? null) : item.sale,
+  }));
   const todayCogs = sumCogsForPeriod(saleItemRows, today);
   const monthCogs = saleItemRows.reduce((s, item) => {
     const d = item.sale?.sale_date?.split('T')[0];
