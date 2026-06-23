@@ -6,12 +6,11 @@ import Link from 'next/link';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Loader2, Mail, Lock, ArrowRight } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { createClient } from '@/lib/supabase/client';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -80,94 +79,101 @@ export default function LoginPage() {
   };
 
   return (
-    <Card className="shadow-lg shadow-slate-200/40 border-slate-100 bg-white/95 backdrop-blur-sm rounded-2xl">
-      <CardHeader className="space-y-1 pb-4">
-        <CardTitle className="text-2xl font-bold text-slate-900">{t('auth.welcomeBack')}</CardTitle>
-        <CardDescription>{t('auth.signInSubtitle')}</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="email">{t('auth.email')}</Label>
+    <div className="rounded-3xl border border-slate-200/70 bg-white/80 backdrop-blur-xl shadow-xl shadow-slate-300/30 p-7 sm:p-9">
+      <div className="space-y-1.5 mb-7">
+        <h1 className="text-[1.7rem] font-bold tracking-tight text-slate-900">{t('auth.welcomeBack')}</h1>
+        <p className="text-sm text-slate-500">{t('auth.signInSubtitle')}</p>
+      </div>
+
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        <div className="space-y-1.5">
+          <Label htmlFor="email" className="text-slate-700 font-medium">{t('auth.email')}</Label>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <Input
               id="email"
               type="email"
               placeholder="you@example.com"
               autoComplete="email"
               {...register('email')}
-              className={errors.email ? 'border-red-500' : ''}
+              className={`h-12 ps-11 rounded-xl bg-slate-50/80 border-slate-200 focus-visible:bg-white transition-colors ${errors.email ? 'border-red-400' : ''}`}
             />
-            {errors.email && (
-              <p className="text-xs text-red-500">{errors.email.message}</p>
-            )}
           </div>
-
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
-              <Label htmlFor="password">{t('auth.password')}</Label>
-              <Link
-                href="/forgot-password"
-                className="text-xs text-blue-600 hover:text-blue-700 hover:underline"
-              >
-                {t('auth.forgotPassword')}
-              </Link>
-            </div>
-            <div className="relative">
-              <Input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                placeholder="••••••••"
-                autoComplete="current-password"
-                {...register('password')}
-                className={errors.password ? 'border-red-500 pe-10' : 'pe-10'}
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword(!showPassword)}
-                className="absolute end-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-              </button>
-            </div>
-            {errors.password && (
-              <p className="text-xs text-red-500">{errors.password.message}</p>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            <Checkbox
-              id="remember"
-              checked={watch('remember')}
-              onCheckedChange={(checked) => setValue('remember', !!checked)}
-            />
-            <Label htmlFor="remember" className="text-sm font-normal cursor-pointer">
-              {t('auth.rememberMe')}
-            </Label>
-          </div>
-
-          <Button
-            type="submit"
-            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 shadow-md shadow-blue-200/40 text-white h-11"
-            disabled={isLoading}
-          >
-            {isLoading ? (
-              <>
-                <Loader2 className="me-2 h-4 w-4 animate-spin" />
-                {t('auth.signingIn')}
-              </>
-            ) : (
-              t('auth.signIn')
-            )}
-          </Button>
-        </form>
-
-        <div className="mt-4 text-center text-sm text-slate-600">
-          {t('auth.noAccount')}{' '}
-          <Link href="/register" className="text-blue-600 font-medium hover:underline">
-            {t('auth.createOneFree')}
-          </Link>
+          {errors.email && (
+            <p className="text-xs text-red-500">{errors.email.message}</p>
+          )}
         </div>
-      </CardContent>
-    </Card>
+
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label htmlFor="password" className="text-slate-700 font-medium">{t('auth.password')}</Label>
+            <Link
+              href="/forgot-password"
+              className="text-xs font-medium text-blue-600 hover:text-blue-700 hover:underline"
+            >
+              {t('auth.forgotPassword')}
+            </Link>
+          </div>
+          <div className="relative">
+            <Lock className="pointer-events-none absolute start-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+            <Input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              placeholder="••••••••"
+              autoComplete="current-password"
+              {...register('password')}
+              className={`h-12 ps-11 pe-11 rounded-xl bg-slate-50/80 border-slate-200 focus-visible:bg-white transition-colors ${errors.password ? 'border-red-400' : ''}`}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              aria-label={showPassword ? 'Hide password' : 'Show password'}
+              className="absolute end-3.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+          {errors.password && (
+            <p className="text-xs text-red-500">{errors.password.message}</p>
+          )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="remember"
+            checked={watch('remember')}
+            onCheckedChange={(checked) => setValue('remember', !!checked)}
+          />
+          <Label htmlFor="remember" className="text-sm font-normal text-slate-600 cursor-pointer">
+            {t('auth.rememberMe')}
+          </Label>
+        </div>
+
+        <Button
+          type="submit"
+          className="group w-full h-12 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white text-[15px] font-semibold shadow-lg shadow-blue-500/25 transition-all"
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <>
+              <Loader2 className="me-2 h-4 w-4 animate-spin" />
+              {t('auth.signingIn')}
+            </>
+          ) : (
+            <>
+              {t('auth.signIn')}
+              <ArrowRight className="ms-1.5 h-4 w-4 transition-transform group-hover:translate-x-0.5 rtl:group-hover:-translate-x-0.5 rtl:rotate-180" />
+            </>
+          )}
+        </Button>
+      </form>
+
+      <div className="mt-6 text-center text-sm text-slate-600">
+        {t('auth.noAccount')}{' '}
+        <Link href="/register" className="text-blue-600 font-semibold hover:underline">
+          {t('auth.createOneFree')}
+        </Link>
+      </div>
+    </div>
   );
 }
