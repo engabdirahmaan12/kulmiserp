@@ -60,13 +60,13 @@ export async function POST(request: Request) {
       .update({ used: true })
       .eq('id', record.id);
 
-    // Find user in auth schema
-    const { data: authUser } = await supabaseAdmin
-      .schema('auth')
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle();
+    // Find user (auth schema isn't exposed via PostgREST, so use the Admin API)
+    const { data: list, error: listError } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    if (listError) {
+      console.error('listUsers error:', listError);
+      return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    }
+    const authUser = list.users.find((u) => u.email?.toLowerCase() === email);
 
     if (!authUser) {
       return NextResponse.json({ error: 'Account not found' }, { status: 404 });

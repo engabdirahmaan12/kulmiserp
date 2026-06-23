@@ -68,13 +68,13 @@ export async function POST(request: Request) {
     // Dev mode: skip email send, log OTP to console
     const devMode = process.env.OTP_DEV_MODE === 'true';
 
-    // Check user exists via auth schema
-    const { data: authUser } = await supabaseAdmin
-      .schema('auth')
-      .from('users')
-      .select('id')
-      .eq('email', email)
-      .maybeSingle();
+    // Check user exists (auth schema isn't exposed via PostgREST, so use the Admin API)
+    const { data: list, error: listError } = await supabaseAdmin.auth.admin.listUsers({ perPage: 1000 });
+    if (listError) {
+      console.error('listUsers error:', listError);
+      return NextResponse.json({ error: 'Server error' }, { status: 500 });
+    }
+    const authUser = list.users.find((u) => u.email?.toLowerCase() === email);
 
     // Always return success — never reveal if email is registered
     if (!authUser) {
@@ -124,8 +124,13 @@ export async function POST(request: Request) {
 
     if (!resendRes.ok) {
       const errBody = await resendRes.text();
-      console.error('Resend error:', errBody);
-      return NextResponse.json({ error: 'Failed to send email. Please try again.' }, { status: 500 });
+      console.error('Resend error:', resendRes.status, errBody);
+      // Surface the real Resend reason in non-production so setup issues
+      // (unverified domain, invalid key, test-mode recipient) are visible.
+      const detail = process.env.NODE_ENV !== 'production'
+        ? `Email send failed (${resendRes.status}): ${errBody}`
+        : 'Failed to send email. Please try again.';
+      return NextResponse.json({ error: detail }, { status: 500 });
     }
 
     return NextResponse.json({ success: true });
