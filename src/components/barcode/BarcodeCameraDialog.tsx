@@ -48,6 +48,9 @@ export function BarcodeCameraDialog({
   const onOpenChangeRef = useRef(onOpenChange);
   const camerasRef = useRef<CameraDevice[]>([]);
   const startingRef = useRef(false);
+  // Once a code is captured we lock to prevent the continuous decode loop
+  // from firing onScan repeatedly and to stop the camera immediately.
+  const scannedRef = useRef(false);
 
   onScanRef.current = onScan;
   closeOnScanRef.current = closeOnScan;
@@ -121,8 +124,13 @@ export function BarcodeCameraDialog({
               target,
               scanConfig,
               (decoded) => {
+                // Ignore the continuous decode loop after the first hit
+                if (scannedRef.current) return;
                 const code = decoded.trim();
                 if (!code) return;
+                scannedRef.current = true;
+                // Turn the camera off immediately on a successful scan
+                void stopCamera();
                 onScanRef.current(code);
                 toast.success(`Scanned: ${code}`, { duration: 1500 });
                 if (closeOnScanRef.current) onOpenChangeRef.current(false);
@@ -172,6 +180,7 @@ export function BarcodeCameraDialog({
     }
 
     let cancelled = false;
+    scannedRef.current = false; // fresh scan session each time the dialog opens
 
     const init = async () => {
       try {
