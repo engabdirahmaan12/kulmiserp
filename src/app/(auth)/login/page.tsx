@@ -96,7 +96,7 @@ export default function LoginPage() {
               placeholder="you@example.com"
               autoComplete="email"
               {...register('email')}
-              className={`h-12 ps-11 rounded-xl bg-slate-50/80 border-slate-200 focus-visible:bg-white transition-colors ${errors.email ? 'border-red-400' : ''}`}
+              className={`h-12 ps-11 rounded-xl bg-slate-50/80 border-slate-200 text-slate-900 placeholder:text-slate-400 focus-visible:bg-white transition-colors ${errors.email ? 'border-red-400' : ''}`}
             />
           </div>
           {errors.email && (
@@ -122,7 +122,7 @@ export default function LoginPage() {
               placeholder="••••••••"
               autoComplete="current-password"
               {...register('password')}
-              className={`h-12 ps-11 pe-11 rounded-xl bg-slate-50/80 border-slate-200 focus-visible:bg-white transition-colors ${errors.password ? 'border-red-400' : ''}`}
+              className={`h-12 ps-11 pe-11 rounded-xl bg-slate-50/80 border-slate-200 text-slate-900 placeholder:text-slate-400 focus-visible:bg-white transition-colors ${errors.password ? 'border-red-400' : ''}`}
             />
             <button
               type="button"
