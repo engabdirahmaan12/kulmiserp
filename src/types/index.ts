@@ -3,7 +3,7 @@ export type UserRole = 'owner' | 'manager' | 'cashier' | 'accountant' | 'purchas
 export type SubscriptionStatus = 'trial' | 'active' | 'expired' | 'suspended' | 'cancelled';
 export type SubscriptionPlan = 'free_trial' | 'basic' | 'business' | 'enterprise';
 
-export type PaymentMethod = 'cash' | 'waafi' | 'evc' | 'sahal' | 'zaad' | 'credit' | 'split';
+export type PaymentMethod = 'cash' | 'bank' | 'waafi' | 'evc' | 'sahal' | 'zaad' | 'premier_wallet' | 'cheque' | 'credit' | 'split' | 'customer_deposit';
 
 export type SaleStatus = 'draft' | 'completed' | 'void' | 'refunded' | 'partially_refunded' | 'held';
 
@@ -187,11 +187,26 @@ export interface Customer {
   notes?: string;
   credit_limit: number;
   balance: number;
+  deposit_balance: number;
   total_purchases: number;
   price_tier?: 'retail' | 'wholesale' | 'distributor';
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface CustomerDeposit {
+  id: string;
+  store_id: string;
+  customer_id: string;
+  amount: number;
+  type: 'deposit' | 'used' | 'refund';
+  payment_method?: string;
+  sale_id?: string;
+  reference?: string;
+  notes?: string;
+  created_by?: string;
+  created_at: string;
 }
 
 export interface Supplier {
@@ -798,11 +813,15 @@ export interface InvoiceSettings {
 }
 
 export const PAYMENT_METHODS_LABELS: Record<PaymentMethod, string> = {
-  cash: 'Cash',
-  waafi: 'WAAFI',
-  evc: 'EVC Plus',
-  sahal: 'Sahal',
-  zaad: 'Zaad',
-  credit: 'Credit',
-  split: 'Split Payment',
+  cash:             'Cash',
+  bank:             'Bank',
+  waafi:            'WAAFI',
+  evc:              'EVC Plus',
+  sahal:            'Sahal',
+  zaad:             'Zaad',
+  premier_wallet:   'Premier Wallet',
+  cheque:           'Cheque',
+  credit:           'Credit',
+  split:            'Split Payment',
+  customer_deposit: 'Customer Deposit',
 };

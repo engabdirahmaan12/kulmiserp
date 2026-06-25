@@ -8,15 +8,16 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageSquare, Phone, Edit, ArrowLeft, Receipt, AlertCircle, Banknote } from 'lucide-react';
+import { MessageSquare, Phone, Edit, ArrowLeft, Receipt, AlertCircle, Banknote, Coins, ArrowDownLeft, History } from 'lucide-react';
 import { format } from 'date-fns';
-import type { Customer, Sale } from '@/types';
+import type { Customer, CustomerDeposit, Sale } from '@/types';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { fetchCustomerDebtsForProfile } from '@/lib/debt/api';
 import { computeCustomerCreditScore, CREDIT_TIER_STYLES, buildWhatsAppDebtReminder, openWhatsApp } from '@/lib/debt/utils';
 import { PRICE_TIER_LABELS, type PriceTier } from '@/lib/units/conversion';
 import { ReceivePaymentModal } from '@/components/sales/ReceivePaymentModal';
+import { CustomerDepositModal } from './CustomerDepositModal';
 
 interface CustomerDetailSheetProps {
   open: boolean;
@@ -33,8 +34,11 @@ function saleCredit(sale: Sale): number {
 
 export function CustomerDetailSheet({ open, customer, onClose, onEdit }: CustomerDetailSheetProps) {
   const { currentStore } = useAuthStore();
-  const [showPayment, setShowPayment] = useState(false);
-  const [paymentSale, setPaymentSale] = useState<Sale | null>(null);
+  const [showPayment,       setShowPayment]       = useState(false);
+  const [paymentSale,       setPaymentSale]       = useState<Sale | null>(null);
+  const [depositModal,      setDepositModal]      = useState<'add' | 'refund' | null>(null);
+  const [showDepositHistory, setShowDepositHistory] = useState(false);
+  const [localDepositBal,   setLocalDepositBal]   = useState<number | null>(null);
 
   const { data: sales = [], isLoading: salesLoading } = useQuery({
     queryKey: ['customer-sales', customer.id],
@@ -58,6 +62,21 @@ export function CustomerDetailSheet({ open, customer, onClose, onEdit }: Custome
     queryFn: () => fetchCustomerDebtsForProfile(customer.id, currentStore!.id),
     enabled: !!currentStore && open,
   });
+
+  const { data: depositHistory = [] } = useQuery({
+    queryKey: ['customer-deposits', customer.id],
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data } = await supabase.rpc('get_customer_deposit_history', {
+        p_store_id: currentStore!.id, p_customer_id: customer.id, p_limit: 30,
+      });
+      const result = data as { success: boolean; rows?: CustomerDeposit[] };
+      return result?.rows ?? [];
+    },
+    enabled: !!currentStore && open && showDepositHistory,
+  });
+
+  const depositBalance = localDepositBal ?? (customer.deposit_balance ?? 0);
 
   const creditScore = computeCustomerCreditScore(debts, customer.total_purchases ?? 0);
 
@@ -130,20 +149,13 @@ export function CustomerDetailSheet({ open, customer, onClose, onEdit }: Custome
             <div className="grid grid-cols-2 gap-3">
               <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
                 <p className="text-xs font-medium text-slate-500">Outstanding Balance</p>
-                <p
-                  className={cn(
-                    'text-2xl font-bold mt-1 tracking-tight',
-                    customer.balance > 0 ? 'text-red-600' : customer.balance < 0 ? 'text-emerald-600' : 'text-slate-900'
-                  )}
-                >
+                <p className={cn('text-2xl font-bold mt-1 tracking-tight', customer.balance > 0 ? 'text-red-600' : customer.balance < 0 ? 'text-emerald-600' : 'text-slate-900')}>
                   {fmt(customer.balance)}
                 </p>
               </div>
               <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm">
                 <p className="text-xs font-medium text-slate-500">Total Purchases</p>
-                <p className="text-2xl font-bold mt-1 tracking-tight text-slate-900">
-                  {fmt(customer.total_purchases)}
-                </p>
+                <p className="text-2xl font-bold mt-1 tracking-tight text-slate-900">{fmt(customer.total_purchases)}</p>
               </div>
               {customer.credit_limit > 0 && (
                 <div className="col-span-2 rounded-2xl border border-slate-100 bg-slate-50/80 p-3 flex items-center justify-between">
@@ -157,6 +169,76 @@ export function CustomerDetailSheet({ open, customer, onClose, onEdit }: Custome
                   {creditScore.label} ({creditScore.score})
                 </span>
               </div>
+            </div>
+
+            {/* ── Deposit Wallet ── */}
+            <div className="rounded-2xl border border-violet-200 bg-gradient-to-br from-violet-50 to-purple-50/40 p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <Coins className="h-4 w-4 text-violet-500" />
+                    <p className="text-sm font-semibold text-violet-900">Customer Wallet</p>
+                  </div>
+                  <p className="text-[11px] text-violet-600">Prepaid deposit balance</p>
+                </div>
+                <p className={cn('text-2xl font-bold tabular-nums', depositBalance > 0 ? 'text-violet-700' : 'text-slate-400')}>
+                  {fmt(depositBalance)}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  className="flex-1 h-9 gap-1.5 bg-violet-600 hover:bg-violet-700 text-xs"
+                  onClick={() => setDepositModal('add')}
+                >
+                  <Coins className="h-3.5 w-3.5" /> Add Deposit
+                </Button>
+                {depositBalance > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 h-9 gap-1.5 border-violet-200 text-violet-700 hover:bg-violet-50 text-xs"
+                    onClick={() => setDepositModal('refund')}
+                  >
+                    <ArrowDownLeft className="h-3.5 w-3.5" /> Refund
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-9 w-9 p-0 text-violet-500 hover:text-violet-700 hover:bg-violet-50"
+                  title="View deposit history"
+                  onClick={() => setShowDepositHistory((v) => !v)}
+                >
+                  <History className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Deposit history (toggle) */}
+              {showDepositHistory && (
+                <div className="mt-3 border-t border-violet-200/70 pt-3 space-y-1.5">
+                  {depositHistory.length === 0 ? (
+                    <p className="text-xs text-violet-500 text-center py-2">No deposit history</p>
+                  ) : depositHistory.map((d) => (
+                    <div key={d.id} className="flex items-center justify-between text-xs">
+                      <div>
+                        <span className={cn(
+                          'inline-block rounded px-1.5 py-0.5 font-semibold mr-1.5 text-[10px]',
+                          d.type === 'deposit' ? 'bg-violet-100 text-violet-700'
+                            : d.type === 'used' ? 'bg-blue-100 text-blue-700'
+                              : 'bg-rose-100 text-rose-700',
+                        )}>
+                          {d.type === 'deposit' ? 'Deposit' : d.type === 'used' ? 'Used' : 'Refund'}
+                        </span>
+                        <span className="text-slate-500">{format(new Date(d.created_at), 'MMM d, yyyy')}</span>
+                      </div>
+                      <span className={cn('tabular-nums font-semibold', d.amount > 0 ? 'text-violet-700' : 'text-slate-600')}>
+                        {d.amount > 0 ? '+' : ''}{fmt(d.amount)}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {customer.balance > 0 && (
@@ -285,6 +367,19 @@ export function CustomerDetailSheet({ open, customer, onClose, onEdit }: Custome
           customer={paymentSale ? undefined : customer}
           onClose={() => { setShowPayment(false); setPaymentSale(null); }}
         />
+
+        {depositModal && (
+          <CustomerDepositModal
+            open={true}
+            customer={{ ...customer, deposit_balance: depositBalance }}
+            mode={depositModal}
+            onClose={() => setDepositModal(null)}
+            onSuccess={(newBal) => {
+              setLocalDepositBal(newBal);
+              setShowDepositHistory(true);
+            }}
+          />
+        )}
       </SheetContent>
     </Sheet>
   );

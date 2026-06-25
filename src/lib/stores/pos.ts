@@ -28,6 +28,7 @@ interface PosState {
   // Payment
   payment_method: PaymentMethod;
   payment_details: PaymentDetail[];
+  deposit_amount: number;
   
   // Held carts
   held_carts: HeldCart[];
@@ -58,6 +59,7 @@ interface PosState {
   setNotes: (notes: string) => void;
   setPaymentMethod: (method: PaymentMethod) => void;
   setPaymentDetails: (details: PaymentDetail[]) => void;
+  setDepositAmount: (amount: number) => void;
   clearCart: () => void;
   holdCart: (name: string) => HeldCart | null;
   mergeHeldCarts: (carts: HeldCart[]) => void;
@@ -116,6 +118,7 @@ export const usePosStore = create<PosState>()(
       notes: '',
       payment_method: 'cash',
       payment_details: [],
+      deposit_amount: 0,
       held_carts: [],
       offline_queue: [],
       isCheckoutOpen: false,
@@ -245,6 +248,7 @@ export const usePosStore = create<PosState>()(
       setNotes: (notes) => set({ notes }),
       setPaymentMethod: (method) => set({ payment_method: method }),
       setPaymentDetails: (details) => set({ payment_details: details }),
+      setDepositAmount: (amount) => set({ deposit_amount: amount }),
 
       clearCart: () =>
         set({
@@ -255,6 +259,7 @@ export const usePosStore = create<PosState>()(
           notes: '',
           payment_method: 'cash',
           payment_details: [],
+          deposit_amount: 0,
           isCheckoutOpen: false,
         }),
 
