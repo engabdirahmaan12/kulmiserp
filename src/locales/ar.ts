@@ -424,6 +424,7 @@ export const ar: Messages = {
     useDeposit: 'استخدام وديعة العميل',
     available: 'المتاح',
     depositBalance: 'رصيد الوديعة',
+    outstandingDebt: 'الدين المستحق',
     depositAmount: 'مبلغ الوديعة المستخدم',
     depositApplied: 'الوديعة المطبّقة',
     afterDeposit: 'المبلغ المتبقي للتحصيل',

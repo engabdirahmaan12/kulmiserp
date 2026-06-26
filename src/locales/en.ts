@@ -423,6 +423,7 @@ export const en = {
     useDeposit: 'Use Customer Deposit',
     available: 'Available',
     depositBalance: 'Deposit Balance',
+    outstandingDebt: 'Outstanding Debt',
     depositAmount: 'Deposit amount to use',
     depositApplied: 'Deposit applied',
     afterDeposit: 'Remaining to collect',

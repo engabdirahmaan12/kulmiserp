@@ -424,6 +424,7 @@ export const so: Messages = {
     useDeposit: 'Isticmaal Lacagta La Dhajiyay',
     available: 'La heli karo',
     depositBalance: 'Hadhka Lacagta',
+    outstandingDebt: 'Deynta La Sugayo',
     depositAmount: 'Lacagta la isticmaali doono',
     depositApplied: 'Lacagta la isticmaalay',
     afterDeposit: 'Kala-duwanaanshaha la soo qaadan doono',

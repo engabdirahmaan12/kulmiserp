@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/lib/stores/auth';
 import { usePosStore } from '@/lib/stores/pos';
@@ -95,7 +95,26 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
   const [methodMenuId,        setMethodMenuId]        = useState<string | null>(null);
 
   const currency     = currentStore?.currency || 'USD';
-  const depositBal   = customer?.deposit_balance ?? 0;
+
+  // ── Real-time customer balances (never trust the cached POS customer) ────────
+  const { data: liveBalances } = useQuery({
+    queryKey: ['pos-customer-balances', customer?.id],
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data, error } = await supabase
+        .from('customers')
+        .select('deposit_balance, balance, credit_limit')
+        .eq('id', customer!.id)
+        .single();
+      if (error) throw error;
+      return data as { deposit_balance: number; balance: number; credit_limit: number };
+    },
+    enabled: !!customer?.id && open,
+    staleTime: 0,
+  });
+
+  const depositBal   = liveBalances?.deposit_balance ?? customer?.deposit_balance ?? 0;
+  const debtBal      = liveBalances?.balance ?? customer?.balance ?? 0;
   const hasDeposit   = depositBal > 0;
 
   // ── Totals ─────────────────────────────────────────────────────────────────
@@ -348,6 +367,14 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
       queryClient.invalidateQueries({ queryKey: ['products',            currentStore?.id] });
       queryClient.invalidateQueries({ queryKey: ['store-transactions',  currentStore?.id] });
       queryClient.invalidateQueries({ queryKey: ['customer-deposits',   customer?.id] });
+      queryClient.invalidateQueries({ queryKey: ['customers',           currentStore?.id] });
+      // Keep the POS customer + live balances in sync after deposit/credit is applied
+      if (customer) {
+        const newDeposit = Math.max(0, depositBal - depositAmt);
+        const newDebt    = debtBal + creditAmount;
+        setCustomer({ ...customer, deposit_balance: newDeposit, balance: newDebt });
+        queryClient.invalidateQueries({ queryKey: ['pos-customer-balances', customer.id] });
+      }
       if (data.offline) toast.message(t('pos.saleSavedOffline'));
     },
 
@@ -474,11 +501,18 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
                         <div>
                           <p className="text-sm font-medium text-slate-900">{customer.full_name}</p>
                           {customer.phone && <p className="text-xs text-slate-500">{customer.phone}</p>}
-                          {(customer.deposit_balance ?? 0) > 0 && (
-                            <p className="text-xs text-violet-600 font-medium mt-0.5">
-                              {t('pos.depositBalance')}: {fmtC(customer.deposit_balance ?? 0)}
-                            </p>
-                          )}
+                          <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
+                            {depositBal > 0 && (
+                              <span className="text-xs text-violet-600 font-medium">
+                                {t('pos.depositBalance')}: {fmtC(depositBal)}
+                              </span>
+                            )}
+                            {debtBal > 0 && (
+                              <span className="text-xs text-red-600 font-medium">
+                                {t('pos.outstandingDebt')}: {fmtC(debtBal)}
+                              </span>
+                            )}
+                          </div>
                         </div>
                         <Button type="button" variant="outline" size="sm" className="h-8 text-xs" onClick={() => setShowCustomerSearch(true)}>
                           {t('pos.change')}
