@@ -271,9 +271,72 @@ export interface Supplier {
   address?: string;
   notes?: string;
   balance: number;
+  advance_balance?: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface EmployeeLoan {
+  id: string;
+  store_id: string;
+  employee_id: string;
+  employee_name?: string;
+  employee_role?: string;
+  original_amount: number;
+  outstanding_balance: number;
+  status: 'outstanding' | 'partial' | 'settled';
+  payment_method: string;
+  reason?: string;
+  notes?: string;
+  reference?: string;
+  due_date?: string;
+  created_by?: string;
+  created_at: string;
+  payments?: EmployeeLoanPayment[];
+}
+
+export interface EmployeeLoanPayment {
+  id: string;
+  store_id: string;
+  loan_id: string;
+  employee_id: string;
+  amount: number;
+  payment_method: string;
+  notes?: string;
+  reference?: string;
+  created_by?: string;
+  created_at: string;
+}
+
+export interface SupplierAdvance {
+  id: string;
+  store_id: string;
+  supplier_id: string;
+  supplier_name?: string;
+  original_amount: number;
+  outstanding_balance: number;
+  status: 'outstanding' | 'partial' | 'settled';
+  payment_method: string;
+  reason?: string;
+  notes?: string;
+  reference?: string;
+  created_by?: string;
+  created_at: string;
+  payments?: SupplierAdvancePayment[];
+}
+
+export interface SupplierAdvancePayment {
+  id: string;
+  store_id: string;
+  advance_id: string;
+  supplier_id: string;
+  amount: number;
+  payment_method: string;
+  notes?: string;
+  reference?: string;
+  created_by?: string;
+  created_at: string;
 }
 
 export interface Sale {
@@ -590,6 +653,7 @@ export interface Employee {
   role_title?: string;
   base_salary: number;
   payment_method: string;
+  loan_balance?: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;

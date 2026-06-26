@@ -20,6 +20,7 @@ import {
   Building2,
   BookMarked,
   Banknote,
+  HandCoins,
   Package,
   Coins,
   Lock,
@@ -38,6 +39,7 @@ export type AccountingTabId =
   | 'expenses'
   | 'payments'
   | 'transfers'
+  | 'loans'
   | 'receivables'
   | 'payables'
   | 'accounts'
@@ -74,6 +76,7 @@ export const ACCOUNTING_NAV: NavGroup[] = [
     items: [
       { id: 'payments',   labelKey: 'accounting.tabPayments',   icon: Wallet         },
       { id: 'transfers',  labelKey: 'accounting.tabTransfers',  icon: ArrowLeftRight },
+      { id: 'loans',      labelKey: 'accounting.tabLoans',      icon: HandCoins      },
       { id: 'expenses',   labelKey: 'accounting.tabExpenses',   icon: Receipt        },
       { id: 'receivables',labelKey: 'accounting.tabReceivables',icon: Users          },
       { id: 'payables',   labelKey: 'accounting.tabPayables',   icon: Building2      },

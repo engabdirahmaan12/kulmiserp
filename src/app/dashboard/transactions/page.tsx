@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/select';
 import {
   ArrowLeftRight, Search, ChevronLeft, ChevronRight, ExternalLink,
-  Receipt, ShoppingBag, ShoppingCart, Calendar, X,
+  Receipt, ShoppingBag, ShoppingCart, Calendar, X, Coins, Banknote, Users, Truck,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { btnOutline, inputSoft, tableHead } from '@/lib/ui-classes';
@@ -34,6 +34,11 @@ const TYPE_CLASS: Record<string, { className: string; icon: typeof Receipt }> = 
   supplier_payment: { className: 'bg-indigo-100 text-indigo-700', icon: Receipt },
   deposit: { className: 'bg-cyan-100 text-cyan-700', icon: Receipt },
   withdrawal: { className: 'bg-rose-100 text-rose-700', icon: Receipt },
+  customer_deposit: { className: 'bg-violet-100 text-violet-700', icon: Coins },
+  customer_advance: { className: 'bg-amber-100 text-amber-700', icon: Banknote },
+  employee_loan: { className: 'bg-purple-100 text-purple-700', icon: Users },
+  supplier_advance: { className: 'bg-sky-100 text-sky-700', icon: Truck },
+  transfer: { className: 'bg-slate-100 text-slate-700', icon: ArrowLeftRight },
 };
 
 const STATUS_COLORS: Record<string, string> = {
@@ -98,6 +103,11 @@ export default function TransactionsPage() {
     supplier_payment: { label: t('transactions.typeSupplierPayment'), ...TYPE_CLASS.supplier_payment },
     deposit: { label: t('transactions.typeDeposit'), ...TYPE_CLASS.deposit },
     withdrawal: { label: t('transactions.typeWithdrawal'), ...TYPE_CLASS.withdrawal },
+    customer_deposit: { label: t('transactions.typeCustomerDeposit'), ...TYPE_CLASS.customer_deposit },
+    customer_advance: { label: t('transactions.typeCustomerAdvance'), ...TYPE_CLASS.customer_advance },
+    employee_loan: { label: t('transactions.typeEmployeeLoan'), ...TYPE_CLASS.employee_loan },
+    supplier_advance: { label: t('transactions.typeSupplierAdvance'), ...TYPE_CLASS.supplier_advance },
+    transfer: { label: t('transactions.typeTransfer'), ...TYPE_CLASS.transfer },
   };
   const storeTz = currentStore?.timezone ?? 'Africa/Mogadishu';
   const [page, setPage] = useState(1);
@@ -290,6 +300,11 @@ export default function TransactionsPage() {
               <SelectItem value="supplier_payment">{t('transactions.filterSupplierPayment')}</SelectItem>
               <SelectItem value="deposit">{t('transactions.filterDeposit')}</SelectItem>
               <SelectItem value="withdrawal">{t('transactions.filterWithdrawal')}</SelectItem>
+              <SelectItem value="customer_deposit">{t('transactions.typeCustomerDeposit')}</SelectItem>
+              <SelectItem value="customer_advance">{t('transactions.typeCustomerAdvance')}</SelectItem>
+              <SelectItem value="employee_loan">{t('transactions.typeEmployeeLoan')}</SelectItem>
+              <SelectItem value="supplier_advance">{t('transactions.typeSupplierAdvance')}</SelectItem>
+              <SelectItem value="transfer">{t('transactions.typeTransfer')}</SelectItem>
             </SelectContent>
           </Select>
           {hasActiveFilters && (
