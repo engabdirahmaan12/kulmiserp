@@ -3,7 +3,7 @@ export type UserRole = 'owner' | 'manager' | 'cashier' | 'accountant' | 'purchas
 export type SubscriptionStatus = 'trial' | 'active' | 'expired' | 'suspended' | 'cancelled';
 export type SubscriptionPlan = 'free_trial' | 'basic' | 'business' | 'enterprise';
 
-export type PaymentMethod = 'cash' | 'bank' | 'waafi' | 'evc' | 'sahal' | 'zaad' | 'premier_wallet' | 'cheque' | 'credit' | 'split' | 'customer_deposit';
+export type PaymentMethod = 'cash' | 'bank' | 'waafi' | 'evc' | 'sahal' | 'zaad' | 'premier_wallet' | 'cheque' | 'credit' | 'split' | 'customer_deposit' | (string & {});
 
 export type SaleStatus = 'draft' | 'completed' | 'void' | 'refunded' | 'partially_refunded' | 'held';
 
@@ -384,6 +384,9 @@ export interface StorePaymentMethod {
   slug: string;
   label: string;
   account_id: string;
+  account_number?: string | null;
+  account_name?: string | null;
+  description?: string | null;
   is_active: boolean;
   is_system: boolean;
   sort_order: number;
@@ -812,7 +815,7 @@ export interface InvoiceSettings {
   layout?: InvoiceLayout;
 }
 
-export const PAYMENT_METHODS_LABELS: Record<PaymentMethod, string> = {
+export const PAYMENT_METHODS_LABELS: Record<string, string> = {
   cash:             'Cash',
   bank:             'Bank',
   waafi:            'WAAFI',

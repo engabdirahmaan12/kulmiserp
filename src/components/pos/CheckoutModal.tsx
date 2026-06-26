@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import type { PaymentDetail, PaymentMethod, Product } from '@/types';
 import { cn } from '@/lib/utils';
+import { useStorePaymentMethods, methodsToPaymentOptions, FALLBACK_PAYMENT_OPTIONS, type DynamicPaymentOption } from '@/lib/hooks/useStorePaymentMethods';
 import { findBelowCostItems, getPosAllowBelowCost } from '@/lib/pos/pricing';
 import { toSaleRpcItem } from '@/lib/pos/units';
 import { validateCartStock } from '@/lib/pos/stock';
@@ -33,33 +34,13 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 
 type PaymentMode = 'full' | 'partial' | 'credit' | 'split';
 
-interface PaymentOption {
-  method: PaymentMethod;
-  label: string;
-  icon: typeof Wallet;
-  group: string;
-}
-
 interface SplitLine {
   id: string;
   method: PaymentMethod;
   amount: string;
 }
 
-// ─── Payment options catalog ───────────────────────────────────────────────────
-
-const PAYMENT_OPTIONS: PaymentOption[] = [
-  { method: 'cash',           label: 'Cash',           icon: Wallet,    group: 'cash'   },
-  { method: 'bank',           label: 'Bank',           icon: Landmark,  group: 'cash'   },
-  { method: 'cheque',         label: 'Cheque',         icon: Landmark,  group: 'cash'   },
-  { method: 'evc',            label: 'EVC Plus',       icon: Smartphone, group: 'mobile' },
-  { method: 'waafi',          label: 'WAAFI',          icon: Smartphone, group: 'mobile' },
-  { method: 'sahal',          label: 'Sahal',          icon: Smartphone, group: 'mobile' },
-  { method: 'zaad',           label: 'Zaad',           icon: Smartphone, group: 'mobile' },
-  { method: 'premier_wallet', label: 'Premier Wallet', icon: Smartphone, group: 'mobile' },
-];
-
-const DEPOSIT_OPTION: PaymentOption = {
+const DEPOSIT_OPTION: DynamicPaymentOption = {
   method: 'customer_deposit',
   label: 'Customer Deposit',
   icon: Coins,
@@ -91,6 +72,12 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
   const { items, customer, setCustomer, discount_amount, discount_type, notes, setNotes, clearCart } =
     usePosStore();
   const queryClient = useQueryClient();
+
+  // ── Dynamic payment methods from store settings ────────────────────────────
+  const { data: storePaymentMethods = [] } = useStorePaymentMethods();
+  const paymentOptions = storePaymentMethods.length > 0
+    ? methodsToPaymentOptions(storePaymentMethods)
+    : FALLBACK_PAYMENT_OPTIONS;
 
   // ── State ──────────────────────────────────────────────────────────────────
   const [paymentMode,         setPaymentMode]         = useState<PaymentMode>('full');
@@ -349,7 +336,7 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
           ? t('pos.split')
           : isCredit
             ? t('pos.creditLabel')
-            : PAYMENT_OPTIONS.find((p) => p.method === selectedMethod)?.label ?? selectedMethod,
+            : paymentOptions.find((p) => p.method === selectedMethod)?.label ?? selectedMethod,
         payment_status:   creditAmount > 0 ? (paidAmount > 0 ? 'partial' : 'unpaid') : 'paid',
         status:           'completed',
         notes:            data.offline ? t('pos.savedOffline') : checkoutNotes || undefined,
@@ -384,8 +371,8 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
     showDeposit?: boolean;
     menuId: string;
   }) => {
-    const opts    = [...PAYMENT_OPTIONS, ...(showDeposit ? [DEPOSIT_OPTION] : [])];
-    const current = opts.find((o) => o.method === value) ?? PAYMENT_OPTIONS[0];
+    const opts    = [...paymentOptions, ...(showDeposit ? [DEPOSIT_OPTION] : [])];
+    const current = opts.find((o) => o.method === value) ?? paymentOptions[0] ?? DEPOSIT_OPTION;
     const Icon    = current.icon;
     const isOpen  = methodMenuId === menuId;
 
@@ -571,6 +558,7 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
                     <PaymentMethodGrid
                       selected={selectedMethod}
                       onSelect={setSelectedMethod}
+                      options={paymentOptions}
                     />
                   </div>
                 )}
@@ -594,7 +582,7 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
                       </p>
                     )}
                     <Label className="text-sm font-semibold text-slate-900">{t('pos.receivePaymentInto')}</Label>
-                    <PaymentMethodGrid selected={selectedMethod} onSelect={setSelectedMethod} />
+                    <PaymentMethodGrid selected={selectedMethod} onSelect={setSelectedMethod} options={paymentOptions} />
                   </div>
                 )}
 
@@ -691,7 +679,7 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
                     {splitLines.some((l) => parseFloat(l.amount) > 0) && (
                       <div className="rounded-lg bg-slate-50 border border-slate-200 px-3 py-2 space-y-1">
                         {splitLines.filter((l) => parseFloat(l.amount) > 0).map((l) => {
-                          const opt = PAYMENT_OPTIONS.find((o) => o.method === l.method);
+                          const opt = paymentOptions.find((o) => o.method === l.method);
                           return (
                             <div key={l.id} className="flex justify-between text-xs text-slate-600">
                               <span>{opt?.label ?? l.method}</span>
@@ -831,11 +819,20 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
 }
 
 // ─── Payment method grid (full/partial modes) ─────────────────────────────────
-function PaymentMethodGrid({ selected, onSelect }: { selected: PaymentMethod; onSelect: (m: PaymentMethod) => void }) {
+function PaymentMethodGrid({
+  selected,
+  onSelect,
+  options,
+}: {
+  selected: PaymentMethod;
+  onSelect: (m: PaymentMethod) => void;
+  options: DynamicPaymentOption[];
+}) {
   const groups = [
-    { key: 'cash',   label: 'Cash & Bank',   methods: PAYMENT_OPTIONS.filter((o) => o.group === 'cash') },
-    { key: 'mobile', label: 'Mobile Money',  methods: PAYMENT_OPTIONS.filter((o) => o.group === 'mobile') },
-  ];
+    { key: 'cash',   label: 'Cash & Bank',  methods: options.filter((o) => o.group === 'cash') },
+    { key: 'mobile', label: 'Mobile Money', methods: options.filter((o) => o.group === 'mobile') },
+    { key: 'other',  label: 'Other',        methods: options.filter((o) => o.group !== 'cash' && o.group !== 'mobile') },
+  ].filter((g) => g.methods.length > 0);
 
   return (
     <div className="space-y-2.5">

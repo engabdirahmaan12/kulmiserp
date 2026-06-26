@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { Loader2, Coins, ArrowDownLeft } from 'lucide-react';
 import type { Customer } from '@/types';
 import { cn } from '@/lib/utils';
+import { useStorePaymentMethods } from '@/lib/hooks/useStorePaymentMethods';
 
 interface CustomerDepositModalProps {
   open: boolean;
@@ -28,17 +29,6 @@ interface CustomerDepositModalProps {
   onClose: () => void;
   onSuccess?: (newBalance: number) => void;
 }
-
-const PAYMENT_METHODS = [
-  { value: 'cash',           label: 'Cash'          },
-  { value: 'bank',           label: 'Bank Transfer' },
-  { value: 'evc',            label: 'EVC Plus'      },
-  { value: 'waafi',          label: 'WAAFI'         },
-  { value: 'sahal',          label: 'Sahal'         },
-  { value: 'zaad',           label: 'Zaad'          },
-  { value: 'premier_wallet', label: 'Premier Wallet'},
-  { value: 'cheque',         label: 'Cheque'        },
-];
 
 export function CustomerDepositModal({
   open,
@@ -49,6 +39,16 @@ export function CustomerDepositModal({
 }: CustomerDepositModalProps) {
   const { currentStore, user } = useAuthStore();
   const queryClient = useQueryClient();
+
+  const { data: storePaymentMethods = [] } = useStorePaymentMethods();
+  const depositPaymentMethods = storePaymentMethods.length > 0
+    ? storePaymentMethods.filter((m) => m.slug !== 'customer_deposit' && m.is_active)
+    : [
+        { slug: 'cash',           label: 'Cash'           },
+        { slug: 'bank',           label: 'Bank Transfer'  },
+        { slug: 'evc',            label: 'EVC Plus'       },
+        { slug: 'waafi',          label: 'WAAFI'          },
+      ];
 
   const [amount,        setAmount]        = useState('');
   const [paymentMethod, setPaymentMethod] = useState('cash');
@@ -160,8 +160,8 @@ export function CustomerDepositModal({
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {PAYMENT_METHODS.map((m) => (
-                  <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
+                {depositPaymentMethods.map((m) => (
+                  <SelectItem key={m.slug} value={m.slug}>{m.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
