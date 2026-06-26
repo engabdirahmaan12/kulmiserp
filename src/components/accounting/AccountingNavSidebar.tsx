@@ -37,6 +37,7 @@ export type AccountingTabId =
   | 'journals'
   | 'expenses'
   | 'payments'
+  | 'transfers'
   | 'receivables'
   | 'payables'
   | 'accounts'
@@ -71,10 +72,11 @@ export const ACCOUNTING_NAV: NavGroup[] = [
   {
     labelKey: 'accounting.navGroupCash',
     items: [
-      { id: 'payments', labelKey: 'accounting.tabPayments', icon: Wallet },
-      { id: 'expenses', labelKey: 'accounting.tabExpenses', icon: Receipt },
-      { id: 'receivables', labelKey: 'accounting.tabReceivables', icon: Users },
-      { id: 'payables', labelKey: 'accounting.tabPayables', icon: Building2 },
+      { id: 'payments',   labelKey: 'accounting.tabPayments',   icon: Wallet         },
+      { id: 'transfers',  labelKey: 'accounting.tabTransfers',  icon: ArrowLeftRight },
+      { id: 'expenses',   labelKey: 'accounting.tabExpenses',   icon: Receipt        },
+      { id: 'receivables',labelKey: 'accounting.tabReceivables',icon: Users          },
+      { id: 'payables',   labelKey: 'accounting.tabPayables',   icon: Building2      },
     ],
   },
   {

@@ -87,7 +87,7 @@ export const NAVBAR_QUICK_LINKS = [
 /** Valid accounting tab ids for in-page navigation */
 export const ACCOUNTING_TAB_IDS = [
   'dashboard', 'pnl', 'balance-sheet', 'cash-flow', 'trial-balance', 'ledger', 'journals',
-  'expenses', 'payments', 'receivables', 'payables', 'accounts', 'payroll', 'valuation',
+  'expenses', 'payments', 'transfers', 'receivables', 'payables', 'accounts', 'payroll', 'valuation',
   'currency', 'settings', 'periods', 'audit',
 ] as const;
 

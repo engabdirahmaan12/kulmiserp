@@ -456,6 +456,7 @@ const TAB_SHEET_BUILDERS: Record<
   journals: (d) => [{ name: 'Ledger Activity', rows: buildJournalSheet(d) }],
   expenses: (d) => [{ name: 'Expenses', rows: buildExpensesSheet(d) }],
   payments: (d) => [{ name: 'Payment Accounts', rows: buildPaymentsSheet(d) }],
+  transfers: () => [],
   receivables: (d) => [{ name: 'Receivables', rows: buildReceivablesSheet(d) }],
   payables: (d) => [{ name: 'Payables', rows: buildPayablesSheet(d) }],
   accounts: (d) => [{ name: 'Chart of Accounts', rows: buildAccountsSheet(d) }],

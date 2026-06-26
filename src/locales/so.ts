@@ -976,6 +976,7 @@ export const so: Messages = {
     tabJournals: 'Diiwaanka Hawlgalka',
     tabLedger: 'Diiwaanka Guud',
     tabPayments: 'Akoonnada Lacag-bixinta',
+    tabTransfers: 'Wareejinta Lacagta',
     tabExpenses: 'Kharashyada',
     tabReceivables: 'Lacagaha Laga Heli Karo',
     tabPayables: 'Lacagaha La Bixin Karo',

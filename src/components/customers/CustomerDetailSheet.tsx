@@ -8,9 +8,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sh
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageSquare, Phone, Edit, ArrowLeft, Receipt, AlertCircle, Banknote, Coins, ArrowDownLeft, History } from 'lucide-react';
+import { MessageSquare, Phone, Edit, ArrowLeft, Receipt, AlertCircle, Banknote, Coins, ArrowDownLeft, History, FileText } from 'lucide-react';
 import { format } from 'date-fns';
-import type { Customer, CustomerDeposit, Sale } from '@/types';
+import type { Customer, CustomerDeposit, CustomerAdvance, Sale } from '@/types';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { fetchCustomerDebtsForProfile } from '@/lib/debt/api';
@@ -18,6 +18,8 @@ import { computeCustomerCreditScore, CREDIT_TIER_STYLES, buildWhatsAppDebtRemind
 import { PRICE_TIER_LABELS, type PriceTier } from '@/lib/units/conversion';
 import { ReceivePaymentModal } from '@/components/sales/ReceivePaymentModal';
 import { CustomerDepositModal } from './CustomerDepositModal';
+import { CustomerAdvanceModal } from './CustomerAdvanceModal';
+import { CustomerStatementSheet } from './CustomerStatementSheet';
 
 interface CustomerDetailSheetProps {
   open: boolean;
@@ -34,11 +36,15 @@ function saleCredit(sale: Sale): number {
 
 export function CustomerDetailSheet({ open, customer, onClose, onEdit }: CustomerDetailSheetProps) {
   const { currentStore } = useAuthStore();
-  const [showPayment,       setShowPayment]       = useState(false);
-  const [paymentSale,       setPaymentSale]       = useState<Sale | null>(null);
-  const [depositModal,      setDepositModal]      = useState<'add' | 'refund' | null>(null);
-  const [showDepositHistory, setShowDepositHistory] = useState(false);
-  const [localDepositBal,   setLocalDepositBal]   = useState<number | null>(null);
+  const [showPayment,         setShowPayment]         = useState(false);
+  const [paymentSale,         setPaymentSale]         = useState<Sale | null>(null);
+  const [depositModal,        setDepositModal]        = useState<'add' | 'refund' | null>(null);
+  const [showDepositHistory,  setShowDepositHistory]  = useState(false);
+  const [localDepositBal,     setLocalDepositBal]     = useState<number | null>(null);
+  const [advanceModal,        setAdvanceModal]        = useState<'advance' | 'repay' | null>(null);
+  const [selectedAdvance,     setSelectedAdvance]     = useState<CustomerAdvance | null>(null);
+  const [showAdvanceHistory,  setShowAdvanceHistory]  = useState(false);
+  const [showStatement,       setShowStatement]       = useState(false);
 
   const { data: sales = [], isLoading: salesLoading } = useQuery({
     queryKey: ['customer-sales', customer.id],
@@ -76,7 +82,22 @@ export function CustomerDetailSheet({ open, customer, onClose, onEdit }: Custome
     enabled: !!currentStore && open && showDepositHistory,
   });
 
-  const depositBalance = localDepositBal ?? (customer.deposit_balance ?? 0);
+  const { data: advanceData } = useQuery({
+    queryKey: ['customer-advances', customer.id],
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data } = await supabase.rpc('get_customer_advances', {
+        p_store_id: currentStore!.id, p_customer_id: customer.id, p_limit: 20,
+      });
+      const result = data as { success: boolean; advances?: CustomerAdvance[]; total_outstanding?: number };
+      return result;
+    },
+    enabled: !!currentStore && open,
+  });
+
+  const advances         = advanceData?.advances ?? [];
+  const advanceBalance   = advanceData?.total_outstanding ?? (customer as any).advance_balance ?? 0;
+  const depositBalance   = localDepositBal ?? (customer.deposit_balance ?? 0);
 
   const creditScore = computeCustomerCreditScore(debts, customer.total_purchases ?? 0);
 
@@ -241,12 +262,99 @@ export function CustomerDetailSheet({ open, customer, onClose, onEdit }: Custome
               )}
             </div>
 
+            {/* ── Cash Advances ── */}
+            <div className="rounded-2xl border border-amber-200 bg-gradient-to-br from-amber-50 to-orange-50/40 p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div>
+                  <div className="flex items-center gap-1.5 mb-0.5">
+                    <Banknote className="h-4 w-4 text-amber-500" />
+                    <p className="text-sm font-semibold text-amber-900">Cash Advances</p>
+                  </div>
+                  <p className="text-[11px] text-amber-600">Money lent to customer</p>
+                </div>
+                <p className={cn('text-2xl font-bold tabular-nums', advanceBalance > 0 ? 'text-amber-700' : 'text-slate-400')}>
+                  {fmt(advanceBalance)}
+                </p>
+              </div>
+              <div className="flex gap-2">
+                <Button
+                  size="sm"
+                  className="flex-1 h-9 gap-1.5 bg-amber-600 hover:bg-amber-700 text-xs"
+                  onClick={() => { setSelectedAdvance(null); setAdvanceModal('advance'); }}
+                >
+                  <Banknote className="h-3.5 w-3.5" /> Give Advance
+                </Button>
+                {advanceBalance > 0 && (
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="flex-1 h-9 gap-1.5 border-amber-200 text-amber-700 hover:bg-amber-50 text-xs"
+                    onClick={() => {
+                      const oldest = advances.find((a) => a.status !== 'settled');
+                      setSelectedAdvance(oldest ?? null);
+                      setAdvanceModal('repay');
+                    }}
+                  >
+                    <ArrowDownLeft className="h-3.5 w-3.5" /> Repay
+                  </Button>
+                )}
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-9 w-9 p-0 text-amber-500 hover:text-amber-700 hover:bg-amber-50"
+                  title="View advance history"
+                  onClick={() => setShowAdvanceHistory((v) => !v)}
+                >
+                  <History className="h-4 w-4" />
+                </Button>
+              </div>
+
+              {/* Advance history (toggle) */}
+              {showAdvanceHistory && (
+                <div className="mt-3 border-t border-amber-200/70 pt-3 space-y-1.5">
+                  {advances.length === 0 ? (
+                    <p className="text-xs text-amber-500 text-center py-2">No advance history</p>
+                  ) : advances.map((a) => (
+                    <div key={a.id} className="flex items-center justify-between text-xs">
+                      <div>
+                        <span className={cn(
+                          'inline-block rounded px-1.5 py-0.5 font-semibold mr-1.5 text-[10px]',
+                          a.status === 'outstanding' ? 'bg-amber-100 text-amber-700'
+                            : a.status === 'partial' ? 'bg-orange-100 text-orange-700'
+                              : 'bg-emerald-100 text-emerald-700',
+                        )}>
+                          {a.status === 'outstanding' ? 'Outstanding' : a.status === 'partial' ? 'Partial' : 'Settled'}
+                        </span>
+                        <span className="text-slate-500">{format(new Date(a.created_at), 'MMM d, yyyy')}</span>
+                      </div>
+                      <div className="text-right">
+                        <span className="tabular-nums font-semibold text-amber-700">{fmt(a.original_amount)}</span>
+                        {a.outstanding_balance < a.original_amount && (
+                          <span className="ml-1 text-slate-400 text-[10px]">({fmt(a.outstanding_balance)} left)</span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {customer.balance > 0 && (
               <Link href="/dashboard/debts" className="flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 transition-colors">
                 <AlertCircle className="h-4 w-4" />
                 View debt records & payments →
               </Link>
             )}
+
+            {/* Statement link */}
+            <button
+              type="button"
+              onClick={() => setShowStatement(true)}
+              className="w-full flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/60 px-3 py-2.5 text-sm font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800 transition-colors"
+            >
+              <FileText className="h-4 w-4 text-slate-400" />
+              View Full Customer Statement →
+            </button>
 
             {/* Actions */}
             <div className="flex flex-wrap gap-2">
@@ -380,6 +488,23 @@ export function CustomerDetailSheet({ open, customer, onClose, onEdit }: Custome
             }}
           />
         )}
+
+        {advanceModal && (
+          <CustomerAdvanceModal
+            open={true}
+            customer={customer}
+            mode={advanceModal}
+            advance={selectedAdvance}
+            onClose={() => { setAdvanceModal(null); setSelectedAdvance(null); }}
+            onSuccess={() => setShowAdvanceHistory(true)}
+          />
+        )}
+
+        <CustomerStatementSheet
+          open={showStatement}
+          customer={customer}
+          onClose={() => setShowStatement(false)}
+        />
       </SheetContent>
     </Sheet>
   );

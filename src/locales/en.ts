@@ -975,6 +975,7 @@ export const en = {
     tabJournals: 'Ledger activity',
     tabLedger: 'General ledger',
     tabPayments: 'Payment accounts',
+    tabTransfers: 'Fund transfers',
     tabExpenses: 'Expenses',
     tabReceivables: 'Receivables',
     tabPayables: 'Payables',

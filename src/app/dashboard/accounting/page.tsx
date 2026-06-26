@@ -15,6 +15,7 @@ import { BalanceSheetTab } from '@/components/accounting/BalanceSheetTab';
 import { CashFlowTab } from '@/components/accounting/CashFlowTab';
 import { GeneralLedgerTab } from '@/components/accounting/GeneralLedgerTab';
 import { PaymentAccountsTab } from '@/components/accounting/PaymentAccountsTab';
+import { FundTransfersTab } from '@/components/accounting/FundTransfersTab';
 import { ReceivablesTab } from '@/components/accounting/ReceivablesTab';
 import { PayablesTab } from '@/components/accounting/PayablesTab';
 import { AuditLogsTab } from '@/components/accounting/AuditLogsTab';
@@ -85,7 +86,7 @@ function AccountingPageInner() {
   }
 
   const writeOnlyTabs: AccountingTabId[] = [
-    'accounts', 'expenses', 'payroll', 'periods', 'currency', 'settings', 'valuation', 'receivables', 'payables',
+    'accounts', 'expenses', 'payroll', 'periods', 'currency', 'settings', 'valuation', 'receivables', 'payables', 'transfers',
   ];
   const effectiveTab = !canWrite && writeOnlyTabs.includes(activeTab) ? 'dashboard' : activeTab;
 
@@ -157,7 +158,8 @@ function AccountingPageContent({
             {effectiveTab === 'expenses' && (
               <ExpensesTab highlightExpenseId={highlightExpenseId} linkMode="accounting" />
             )}
-            {effectiveTab === 'payments' && <PaymentAccountsTab />}
+            {effectiveTab === 'payments'   && <PaymentAccountsTab />}
+            {effectiveTab === 'transfers'  && <FundTransfersTab />}
             {effectiveTab === 'receivables' && <ReceivablesTab />}
             {effectiveTab === 'payables' && <PayablesTab />}
             {effectiveTab === 'accounts' && <ChartOfAccountsTab />}

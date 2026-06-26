@@ -976,6 +976,7 @@ export const ar: Messages = {
     tabJournals: 'نشاط الدفتر',
     tabLedger: 'الأستاذ العام',
     tabPayments: 'حسابات الدفع',
+    tabTransfers: 'تحويلات الأموال',
     tabExpenses: 'المصروفات',
     tabReceivables: 'المستحقات',
     tabPayables: 'الذمم الدائنة',

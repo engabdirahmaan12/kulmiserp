@@ -209,6 +209,58 @@ export interface CustomerDeposit {
   created_at: string;
 }
 
+export interface CustomerAdvance {
+  id: string;
+  store_id: string;
+  customer_id: string;
+  original_amount: number;
+  outstanding_balance: number;
+  status: 'outstanding' | 'partial' | 'settled';
+  payment_method: string;
+  notes?: string;
+  reference?: string;
+  due_date?: string;
+  created_by?: string;
+  created_at: string;
+  payments?: CustomerAdvancePayment[];
+}
+
+export interface CustomerAdvancePayment {
+  id: string;
+  store_id: string;
+  advance_id: string;
+  customer_id: string;
+  amount: number;
+  payment_method: string;
+  notes?: string;
+  reference?: string;
+  created_by?: string;
+  created_at: string;
+}
+
+export interface FundTransfer {
+  id: string;
+  store_id: string;
+  from_method: string;
+  to_method: string;
+  amount: number;
+  reference?: string;
+  notes?: string;
+  transfer_date: string;
+  created_by?: string;
+  created_by_email?: string;
+  created_at: string;
+}
+
+export interface CustomerStatementEntry {
+  id: string;
+  date: string;
+  type: 'sale_credit' | 'sale_paid' | 'payment' | 'deposit_add' | 'deposit_used' | 'deposit_refund' | 'advance' | 'advance_repayment';
+  description: string;
+  amount: number;
+  reference?: string;
+}
+
 export interface Supplier {
   id: string;
   store_id: string;
