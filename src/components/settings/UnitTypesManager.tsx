@@ -78,6 +78,7 @@ export function UnitTypesManager() {
       return (data ?? []) as UnitType[];
     },
     enabled: !!currentStore,
+    refetchOnMount: 'always',
   });
 
   const refresh = () => {
@@ -99,7 +100,9 @@ export function UnitTypesManager() {
         const { error } = await supabase.from('unit_types').update({ is_active: next }).eq('id', existing.id);
         if (error) throw error;
       } else if (next) {
-        const { error } = await supabase.from('unit_types').insert({
+        // Upsert (not insert) so a row seeded since the list was last fetched
+        // is reactivated instead of colliding on (store_id, code).
+        const { error } = await supabase.from('unit_types').upsert({
           store_id: currentStore!.id,
           code: cat.code,
           name: cat.name,
@@ -107,7 +110,7 @@ export function UnitTypesManager() {
           allows_decimal: cat.allows_decimal,
           sort_order: cat.sort_order,
           is_active: true,
-        });
+        }, { onConflict: 'store_id,code' });
         if (error) throw error;
       }
     },
