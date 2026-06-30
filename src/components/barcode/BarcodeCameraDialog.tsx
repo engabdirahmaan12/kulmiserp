@@ -11,7 +11,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Camera, RefreshCw, SwitchCamera, X } from 'lucide-react';
+import { Camera, CheckCircle2, RefreshCw, ScanLine, SwitchCamera, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   buildCameraFallbacks,
@@ -58,6 +58,7 @@ export function BarcodeCameraDialog({
 
   const [mounted, setMounted] = useState(false);
   const [scanning, setScanning] = useState(false);
+  const [scanned, setScanned] = useState(false);
   const [cameras, setCameras] = useState<CameraDevice[]>([]);
   const [cameraId, setCameraId] = useState<string>('');
   const [error, setError] = useState<string | null>(null);
@@ -131,9 +132,13 @@ export function BarcodeCameraDialog({
                 scannedRef.current = true;
                 // Turn the camera off immediately on a successful scan
                 void stopCamera();
+                setScanned(true);
                 onScanRef.current(code);
                 toast.success(`Scanned: ${code}`, { duration: 1500 });
-                if (closeOnScanRef.current) onOpenChangeRef.current(false);
+                // Brief success flash, then return to the form
+                if (closeOnScanRef.current) {
+                  setTimeout(() => onOpenChangeRef.current(false), 500);
+                }
               },
               () => {},
             );
@@ -181,6 +186,7 @@ export function BarcodeCameraDialog({
 
     let cancelled = false;
     scannedRef.current = false; // fresh scan session each time the dialog opens
+    setScanned(false);
 
     const init = async () => {
       try {
@@ -245,12 +251,14 @@ export function BarcodeCameraDialog({
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="px-4 py-3 border-b flex flex-row items-center justify-between shrink-0 bg-white dark:bg-slate-900">
-          <h2 className="text-sm font-semibold flex items-center gap-2 text-slate-900 dark:text-white">
-            <Camera className="h-4 w-4 text-blue-600" />
+        <div className="px-4 py-3.5 flex flex-row items-center justify-between shrink-0 bg-gradient-to-r from-blue-700 to-indigo-600 text-white">
+          <h2 className="text-sm font-bold flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/15 ring-1 ring-white/25">
+              <ScanLine className="h-4 w-4" />
+            </span>
             {title}
           </h2>
-          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => onOpenChange(false)}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-white hover:bg-white/15" onClick={() => onOpenChange(false)}>
             <X className="h-4 w-4" />
           </Button>
         </div>
@@ -296,8 +304,35 @@ export function BarcodeCameraDialog({
         </div>
 
         <div className="relative flex-1 min-h-[280px] bg-black">
+          <style>{`@keyframes bc-scanline{0%{top:12%;opacity:0}12%{opacity:1}88%{opacity:1}100%{top:88%;opacity:0}}@keyframes bc-pop{0%{transform:scale(.6);opacity:0}60%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}`}</style>
           <div id={regionId} className="w-full h-full min-h-[280px]" />
-          {!scanning && !error && (
+
+          {/* Animated scan line while live */}
+          {scanning && !error && !scanned && (
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
+              <div
+                className="absolute inset-x-10 h-[3px] rounded-full bg-gradient-to-r from-transparent via-sky-400 to-transparent"
+                style={{ boxShadow: '0 0 14px 3px rgba(56,189,248,0.55)', animation: 'bc-scanline 2.4s cubic-bezier(.4,0,.2,1) infinite' }}
+              />
+              <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/60 to-transparent pt-6 pb-3 text-center">
+                <p className="text-[11px] font-medium text-white/85 flex items-center justify-center gap-1.5">
+                  <ScanLine className="h-3.5 w-3.5 text-sky-300" />
+                  Hold the barcode steady inside the frame
+                </p>
+                <p className="text-[10px] text-white/50 mt-0.5">EAN · UPC · Code128 · QR</p>
+              </div>
+            </div>
+          )}
+
+          {/* Success flash */}
+          {scanned && (
+            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-emerald-600/25 backdrop-blur-[1px]">
+              <CheckCircle2 className="h-16 w-16 text-white drop-shadow-lg" style={{ animation: 'bc-pop .3s ease-out' }} />
+              <p className="text-sm font-bold text-white">Scanned</p>
+            </div>
+          )}
+
+          {!scanning && !error && !scanned && (
             <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 text-white/80 pointer-events-none">
               <RefreshCw className="h-6 w-6 animate-spin" />
               <p className="text-xs">Starting camera…</p>
@@ -320,12 +355,6 @@ export function BarcodeCameraDialog({
             </div>
           )}
         </div>
-
-        {scanning && (
-          <p className="text-xs text-center text-slate-500 py-3 shrink-0 bg-white dark:bg-slate-900">
-            Hold barcode steady in the frame — EAN, UPC, Code128, QR supported
-          </p>
-        )}
       </div>
     </div>,
     document.body,

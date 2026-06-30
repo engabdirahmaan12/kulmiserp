@@ -711,7 +711,7 @@ export function ProductFormModal({ open, product, onClose }: ProductFormModalPro
                   onScan={(v) => setValue('barcode', v)}
                   inputClassName={fieldInputClass}
                   className="flex-1"
-                  closeCameraOnScan={false}
+                  closeCameraOnScan
                 />
                 <Button
                   type="button"
