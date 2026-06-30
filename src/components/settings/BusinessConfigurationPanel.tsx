@@ -139,25 +139,12 @@ export function BusinessConfigurationPanel() {
         <p className="text-xs text-slate-500">Customer price tier overrides this when selected at checkout.</p>
       </div>
 
-      <div className="rounded-xl border border-slate-200 p-4 space-y-2">
-        <div className="flex items-center gap-2 text-sm font-medium text-slate-800">
-          <Scale className="h-4 w-4 text-violet-600" />
-          Available unit types ({unitTypes.length})
-        </div>
-        <div className="flex flex-wrap gap-2">
-          {unitTypes.map((u) => (
-            <span
-              key={u.id}
-              className="inline-flex items-center rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-700"
-            >
-              {u.code}
-              {u.allows_decimal ? ' (decimal)' : ''}
-            </span>
-          ))}
-        </div>
+      <div className="flex items-center gap-2 text-sm font-medium text-slate-800">
+        <Scale className="h-4 w-4 text-violet-600" />
+        Available unit types
       </div>
 
-      <UnitTypesManager unitTypes={unitTypes} />
+      <UnitTypesManager />
 
       <Button className={cn(btnPrimary, 'rounded-xl')} onClick={() => save()} disabled={isPending}>
         {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
