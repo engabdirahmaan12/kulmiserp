@@ -32,7 +32,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type PaymentMode = 'full' | 'partial' | 'credit' | 'split';
+type PaymentMode = 'full' | 'partial' | 'credit' | 'split' | 'deposit';
 
 interface SplitLine {
   id: string;
@@ -51,6 +51,7 @@ const MODE_TABS: { id: PaymentMode; labelKey: string; icon: typeof Check }[] = [
   { id: 'full',    labelKey: 'pos.full',    icon: Check       },
   { id: 'partial', labelKey: 'pos.partial', icon: CircleSlash },
   { id: 'credit',  labelKey: 'pos.credit',  icon: CreditCard  },
+  { id: 'deposit', labelKey: 'pos.depositMode', icon: Coins   },
   { id: 'split',   labelKey: 'pos.split',   icon: Layers      },
 ];
 
@@ -88,6 +89,8 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
   const [splitLines,          setSplitLines]          = useState<SplitLine[]>(() => [newSplitLine(), newSplitLine()]);
   const [useDeposit,          setUseDeposit]          = useState(false);
   const [depositInput,        setDepositInput]        = useState('');
+  const [advanceTopUp,        setAdvanceTopUp]        = useState('');
+  const [advanceMethod,       setAdvanceMethod]       = useState<PaymentMethod>('cash');
   const [step,                setStep]                = useState<'payment' | 'success'>('payment');
   const [invoiceData,         setInvoiceData]         = useState<InvoiceData | null>(null);
   const [showCustomerSearch,  setShowCustomerSearch]  = useState(false);
@@ -117,13 +120,46 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
   const debtBal      = liveBalances?.balance ?? customer?.balance ?? 0;
   const hasDeposit   = depositBal > 0;
 
+  // ── Add advance/deposit on the spot (records held money for the customer) ────
+  const { mutate: addAdvanceNow, isPending: addingAdvance } = useMutation({
+    mutationFn: async () => {
+      if (!currentStore || !user || !customer) throw new Error(t('pos.notAuthenticated'));
+      const amt = parseFloat(advanceTopUp) || 0;
+      if (amt <= 0) throw new Error(t('pos.depositAmount'));
+      const supabase = createClient();
+      const { data, error } = await supabase.rpc('add_customer_deposit', {
+        p_store_id:       currentStore.id,
+        p_user_id:        user.id,
+        p_customer_id:    customer.id,
+        p_amount:         amt,
+        p_payment_method: advanceMethod,
+        p_notes:          'Advance taken at checkout',
+        p_reference:      null,
+      });
+      if (error) throw error;
+      const result = data as { success?: boolean; error?: string; deposit_balance?: number };
+      if (result && result.success === false) throw new Error(result.error || t('pos.failedProcessSale'));
+      return result;
+    },
+    onSuccess: () => {
+      toast.success(t('pos.advanceAdded'));
+      setAdvanceTopUp('');
+      queryClient.invalidateQueries({ queryKey: ['pos-customer-balances', customer?.id] });
+      queryClient.invalidateQueries({ queryKey: ['customer-deposits', customer?.id] });
+      queryClient.invalidateQueries({ queryKey: ['customers', currentStore?.id] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   // ── Totals ─────────────────────────────────────────────────────────────────
   const subtotal     = items.reduce((s, i) => s + i.unit_price * i.quantity - i.discount_amount, 0);
   const taxAmount    = items.reduce((s, i) => s + (i.unit_price * i.quantity - i.discount_amount) * (i.tax_rate / 100), 0);
   const discountAmt  = discount_type === 'percentage' ? subtotal * (discount_amount / 100) : discount_amount;
   const total        = subtotal - discountAmt + taxAmount;
 
-  const depositAmt   = useDeposit ? Math.min(Math.max(parseFloat(depositInput) || 0, 0), depositBal) : 0;
+  const isDeposit    = paymentMode === 'deposit';
+  const effectiveUseDeposit = useDeposit || isDeposit;
+  const depositAmt   = effectiveUseDeposit ? Math.min(Math.max(parseFloat(depositInput) || 0, 0), depositBal) : 0;
   const afterDeposit = Math.max(0, total - depositAmt);
 
   const paid         = parseFloat(amountPaid) || 0;
@@ -160,6 +196,12 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
     creditAmount = total;
     finalMethod  = 'credit';
     finalDetails = [];
+  } else if (isDeposit) {
+    // Advance/deposit: apply held balance, remainder auto-becomes customer debt
+    paidAmount   = 0;
+    creditAmount = Math.max(0, total - depositAmt);
+    finalMethod  = 'customer_deposit';
+    finalDetails = depositAmt > 0 ? [{ method: 'customer_deposit' as PaymentMethod, amount: depositAmt }] : [];
   } else if (isPartial) {
     paidAmount   = Math.min(paid, afterDeposit);
     creditAmount = Math.max(0, afterDeposit - paid);
@@ -174,12 +216,13 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
   }
 
   // ── Validation ─────────────────────────────────────────────────────────────
-  const needsCustomer = isPartial || isCredit || useDeposit;
+  const needsCustomer = isPartial || isCredit || isDeposit || useDeposit;
 
   const canSubmit = (() => {
     if (!items.length)                  return false;
     if (needsCustomer && !customer)     return false;
     if (useDeposit && depositAmt <= 0)  return false;
+    if (isDeposit)                      return depositAmt > 0;
     if (isCredit)                       return true;
     if (isFull)                         return afterDeposit >= 0;
     if (isPartial)                      return paid > 0 && paid < afterDeposit;
@@ -202,6 +245,8 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
     setSplitLines([newSplitLine(), newSplitLine()]);
     setUseDeposit(false);
     setDepositInput('');
+    setAdvanceTopUp('');
+    setAdvanceMethod('cash');
     setStep('payment');
     setInvoiceData(null);
     setMethodMenuId(null);
@@ -210,17 +255,19 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
   useEffect(() => {
     if (isFull)    setAmountPaid(afterDeposit.toFixed(2));
     if (isCredit)  setAmountPaid('');
+    if (isDeposit) setAmountPaid('');
   }, [paymentMode, afterDeposit]);
 
-  // Auto-fill deposit when toggled on
+  // Auto-fill deposit when toggled on, or when entering deposit mode
   useEffect(() => {
-    if (useDeposit && customer) {
+    if ((useDeposit || isDeposit) && customer) {
       const autoAmt = Math.min(depositBal, total);
       setDepositInput(autoAmt.toFixed(2));
     } else {
       setDepositInput('');
     }
-  }, [useDeposit, customer]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useDeposit, isDeposit, customer, depositBal]);
 
   // Auto-fill split remaining into last line
   const autoFillLastSplit = () => {
@@ -355,8 +402,10 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
           ? t('pos.split')
           : isCredit
             ? t('pos.creditLabel')
-            : paymentOptions.find((p) => p.method === selectedMethod)?.label ?? selectedMethod,
-        payment_status:   creditAmount > 0 ? (paidAmount > 0 ? 'partial' : 'unpaid') : 'paid',
+            : isDeposit
+              ? t('pos.advancePayment')
+              : paymentOptions.find((p) => p.method === selectedMethod)?.label ?? selectedMethod,
+        payment_status:   creditAmount > 0 ? ((paidAmount + depositAmt) > 0 ? 'partial' : 'unpaid') : 'paid',
         status:           'completed',
         notes:            data.offline ? t('pos.savedOffline') : checkoutNotes || undefined,
       };
@@ -532,7 +581,7 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
                 )}
 
                 {/* Customer Deposit toggle (when customer has balance) */}
-                {customer && hasDeposit && !isCredit && (
+                {customer && hasDeposit && !isCredit && !isDeposit && (
                   <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-3">
                     <div className="flex items-center justify-between">
                       <div>
@@ -573,6 +622,103 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
                       <p className="mt-2 text-xs text-violet-700 font-medium">
                         {t('pos.afterDeposit')}: <strong>{fmtC(afterDeposit)}</strong>
                       </p>
+                    )}
+                  </div>
+                )}
+
+                {/* ── DEPOSIT / ADVANCE mode ── */}
+                {isDeposit && customer && (
+                  <div className="rounded-xl border border-violet-200 bg-violet-50/60 p-4 space-y-3">
+                    <div className="flex items-center gap-2">
+                      <Coins className="h-4 w-4 text-violet-600" />
+                      <p className="text-sm font-semibold text-violet-800">{t('pos.advancePayment')}</p>
+                    </div>
+
+                    {/* Held balance + total */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <div className="rounded-lg bg-white border border-violet-100 px-3 py-2">
+                        <p className="text-[11px] text-violet-500">{t('pos.heldBalance')}</p>
+                        <p className="text-base font-bold text-violet-700 tabular-nums">{fmtC(depositBal)}</p>
+                      </div>
+                      <div className="rounded-lg bg-white border border-slate-100 px-3 py-2">
+                        <p className="text-[11px] text-slate-500">{t('pos.invoiceTotal')}</p>
+                        <p className="text-base font-bold text-slate-800 tabular-nums">{fmtC(total)}</p>
+                      </div>
+                    </div>
+
+                    {/* Add advance now (top-up) */}
+                    <div className="rounded-lg border border-dashed border-violet-200 p-2.5 space-y-2">
+                      <p className="text-[11px] font-medium text-violet-600">{t('pos.addAdvanceNow')}</p>
+                      <div className="flex items-center gap-2">
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={advanceTopUp}
+                          onChange={(e) => setAdvanceTopUp(e.target.value)}
+                          className="h-9 bg-white rounded-lg text-sm"
+                          placeholder={t('pos.depositAmount')}
+                        />
+                        <select
+                          value={advanceMethod}
+                          onChange={(e) => setAdvanceMethod(e.target.value as PaymentMethod)}
+                          className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-700 shrink-0"
+                        >
+                          {paymentOptions.map((o) => (
+                            <option key={o.method} value={o.method}>{o.label}</option>
+                          ))}
+                        </select>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="h-9 shrink-0 border-violet-300 text-violet-700 hover:bg-violet-50"
+                          disabled={addingAdvance || !(parseFloat(advanceTopUp) > 0)}
+                          onClick={() => addAdvanceNow()}
+                        >
+                          {addingAdvance ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Plus className="h-3.5 w-3.5" />}
+                        </Button>
+                      </div>
+                    </div>
+
+                    {/* Amount of held balance to apply */}
+                    <div>
+                      <p className="text-[11px] font-medium text-violet-600 mb-1">{t('pos.applyHeldBalance')}</p>
+                      <div className="flex items-center gap-2">
+                        <Coins className="h-4 w-4 text-violet-500 shrink-0" />
+                        <Input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          max={depositBal}
+                          value={depositInput}
+                          onChange={(e) => setDepositInput(e.target.value)}
+                          className="h-9 bg-white rounded-lg text-sm"
+                          placeholder={t('pos.depositAmount')}
+                        />
+                        <span className="text-xs text-violet-600 shrink-0 tabular-nums">/ {fmtC(depositBal)}</span>
+                      </div>
+                    </div>
+
+                    {/* Breakdown */}
+                    <div className="space-y-1 border-t border-violet-200/70 pt-2 text-sm">
+                      <div className="flex justify-between text-violet-700">
+                        <span>{t('pos.depositApplied')}</span>
+                        <span className="font-semibold tabular-nums">- {fmtC(depositAmt)}</span>
+                      </div>
+                      {creditAmount > 0 && (
+                        <div className="flex justify-between text-red-600">
+                          <span>{t('pos.remainingToDebt')}</span>
+                          <span className="font-semibold tabular-nums">{fmtC(creditAmount)}</span>
+                        </div>
+                      )}
+                      <div className="flex justify-between text-slate-800 font-semibold pt-1 border-t border-violet-100">
+                        <span>{creditAmount > 0 ? t('pos.statusPartial') : t('pos.statusPaid')}</span>
+                        <span className="tabular-nums">{fmtC(total)}</span>
+                      </div>
+                    </div>
+                    {depositBal <= 0 && (
+                      <p className="text-[11px] text-amber-600">{t('pos.noHeldBalance')}</p>
                     )}
                   </div>
                 )}
