@@ -164,6 +164,7 @@ export function RefundModal({ open, sale, onClose }: RefundModalProps) {
       const inv: InvoiceData = {
         type: 'refund',
         invoice_number: data.refund_invoice,
+        store_id: currentStore?.id,
         store_name: currentStore?.name || '',
         currency,
         date: new Date().toISOString(),

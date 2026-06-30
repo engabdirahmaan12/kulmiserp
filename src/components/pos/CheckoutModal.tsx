@@ -366,6 +366,7 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
         type: 'pos',
         template: 'corporate',
         invoice_number: data.invoice_number,
+        store_id:       currentStore?.id,
         store_name:     currentStore?.name || '',
         store_address:  currentStore?.address,
         store_phone:    currentStore?.phone,

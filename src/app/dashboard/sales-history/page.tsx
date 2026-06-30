@@ -617,6 +617,7 @@ function SaleDetailView({
   const invoiceData: InvoiceData = {
     type: sale.status === 'refunded' ? 'refund' : 'custom',
     invoice_number: sale.invoice_number,
+    store_id: store?.id,
     store_name: store?.name || '',
     store_address: store?.address,
     store_phone: store?.phone,

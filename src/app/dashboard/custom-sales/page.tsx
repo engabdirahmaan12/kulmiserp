@@ -778,6 +778,7 @@ export default function CustomSalesPage() {
   const previewData: InvoiceData = {
     type: 'custom',
     invoice_number: invoiceNumber || 'INV-00001',
+    store_id: currentStore?.id,
     store_name: currentStore?.name || 'Store',
     store_address: currentStore?.address,
     store_phone: currentStore?.phone,

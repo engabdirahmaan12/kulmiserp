@@ -37,6 +37,7 @@ export interface InvoiceData {
   type: InvoiceType;
   template?: InvoiceTemplate;
   invoice_number: string;
+  store_id?: string;
   store_name: string;
   store_address?: string;
   store_phone?: string;
@@ -142,11 +143,19 @@ export function buildWhatsAppInvoiceText(data: InvoiceData): string {
   return lines.filter(Boolean).join('\n');
 }
 
+/** Public verification URL encoded in the invoice QR. Includes the store id
+ *  so the lookup is unambiguous (invoice numbers repeat across stores). */
+export function buildInvoiceVerifyUrl(data: InvoiceData): string {
+  const base = 'https://kulmiserp.com/verify';
+  return data.store_id
+    ? `${base}/${data.store_id}/${encodeURIComponent(data.invoice_number)}`
+    : `${base}/${encodeURIComponent(data.invoice_number)}`;
+}
+
 /** QR code pointing to public verification URL */
 export async function generateInvoiceQrDataUrl(data: InvoiceData): Promise<string> {
   const QRCode = await import('qrcode');
-  const url = `https://kulmiserp.com/verify/${data.invoice_number}`;
-  return QRCode.toDataURL(url, { width: 128, margin: 1, color: { dark: '#0f172a', light: '#ffffff' } });
+  return QRCode.toDataURL(buildInvoiceVerifyUrl(data), { width: 128, margin: 1, color: { dark: '#0f172a', light: '#ffffff' } });
 }
 
 /** Generate a print-quality HTML document and open in a new window */

@@ -12,6 +12,7 @@ const PUBLIC_ROUTES = [
   '/forgot-password',
   '/offline',
   '/super-admin/login',
+  '/verify',
   '/api/',
 ];
 
