@@ -65,9 +65,11 @@ interface CheckoutModalProps {
   open: boolean;
   onClose: () => void;
   products: Product[];
+  /** Fired once a sale is successfully recorded (used to reset POS view). */
+  onComplete?: () => void;
 }
 
-export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
+export function CheckoutModal({ open, onClose, products, onComplete }: CheckoutModalProps) {
   const { t } = useTranslation();
   const { currentStore, user } = useAuthStore();
   const { items, customer, setCustomer, discount_amount, discount_type, notes, setNotes, clearCart } =
@@ -426,6 +428,8 @@ export function CheckoutModal({ open, onClose, products }: CheckoutModalProps) {
         queryClient.invalidateQueries({ queryKey: ['pos-customer-balances', customer.id] });
       }
       if (data.offline) toast.message(t('pos.saleSavedOffline'));
+      // Sale recorded — let the POS reset its mobile view back to products
+      onComplete?.();
     },
 
     onError: (err: Error) => toast.error(err.message || t('pos.failedProcessSale')),

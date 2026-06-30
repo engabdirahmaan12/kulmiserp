@@ -391,7 +391,12 @@ export default function PosSystem() {
         </div>
       </div>
 
-      <CheckoutModal open={isCheckoutOpen} onClose={() => setCheckoutOpen(false)} products={products} />
+      <CheckoutModal
+        open={isCheckoutOpen}
+        onClose={() => setCheckoutOpen(false)}
+        products={products}
+        onComplete={() => setMobileView('products')}
+      />
 
       <ProductAddUnitDialog
         open={!!addUnitProduct}
