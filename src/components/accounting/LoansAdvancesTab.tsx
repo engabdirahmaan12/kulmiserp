@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, Fragment } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { createClient } from '@/lib/supabase/client';
 import { useAuthStore } from '@/lib/stores/auth';
@@ -13,7 +13,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { ReportTableShell, reportTableHead, reportTableHeadRight } from '@/components/reports/ReportLayout';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Plus, Loader2, Users, Truck, Banknote, ArrowDownLeft } from 'lucide-react';
+import { Plus, Loader2, Users, Truck, Banknote, ArrowDownLeft, ChevronDown, ChevronRight, History } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
@@ -37,6 +37,7 @@ export function LoansAdvancesTab() {
   const [segment, setSegment] = useState<Segment>('employee');
   const [showCreate, setShowCreate] = useState(false);
   const [settleTarget, setSettleTarget] = useState<EmployeeLoan | SupplierAdvance | null>(null);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
 
   const currency = currentStore?.currency ?? 'USD';
   const fmt = (n: number) =>
@@ -139,49 +140,97 @@ export function LoansAdvancesTab() {
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
-              {segment === 'employee' && empLoans.map((l) => (
-                <tr key={l.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50">
-                  <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{format(new Date(l.created_at), 'MMM d, yyyy')}</td>
-                  <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">
-                    {l.employee_name}
-                    {l.employee_role && <span className="block text-[11px] text-slate-400">{l.employee_role}</span>}
-                  </td>
-                  <td className="px-4 py-3 text-slate-500 text-xs max-w-xs truncate">{l.reason ?? l.reference ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    <Badge className={cn('capitalize text-[10px]', STATUS_BADGE[l.status])}>{l.status}</Badge>
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-slate-600">{fmt(l.original_amount)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums font-bold text-amber-700">{fmt(l.outstanding_balance)}</td>
-                  <td className="px-4 py-3 text-right">
-                    {canWrite && l.status !== 'settled' && (
-                      <Button size="sm" variant="outline" className="h-7 text-xs gap-1 border-emerald-200 text-emerald-700"
-                        onClick={() => setSettleTarget(l)}>
-                        <ArrowDownLeft className="h-3 w-3" /> Repay
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
-              {segment === 'supplier' && supAdvances.map((a) => (
-                <tr key={a.id} className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50">
-                  <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">{format(new Date(a.created_at), 'MMM d, yyyy')}</td>
-                  <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{a.supplier_name}</td>
-                  <td className="px-4 py-3 text-slate-500 text-xs max-w-xs truncate">{a.reason ?? a.reference ?? '—'}</td>
-                  <td className="px-4 py-3">
-                    <Badge className={cn('capitalize text-[10px]', STATUS_BADGE[a.status])}>{a.status}</Badge>
-                  </td>
-                  <td className="px-4 py-3 text-right tabular-nums text-slate-600">{fmt(a.original_amount)}</td>
-                  <td className="px-4 py-3 text-right tabular-nums font-bold text-amber-700">{fmt(a.outstanding_balance)}</td>
-                  <td className="px-4 py-3 text-right">
-                    {canWrite && a.status !== 'settled' && (
-                      <Button size="sm" variant="outline" className="h-7 text-xs gap-1 border-sky-200 text-sky-700"
-                        onClick={() => setSettleTarget(a)}>
-                        <ArrowDownLeft className="h-3 w-3" /> Settle
-                      </Button>
-                    )}
-                  </td>
-                </tr>
-              ))}
+              {segment === 'employee' && empLoans.map((l) => {
+                const open = expandedId === l.id;
+                return (
+                <Fragment key={l.id}>
+                  <tr
+                    className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 cursor-pointer"
+                    onClick={() => setExpandedId(open ? null : l.id)}
+                  >
+                    <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1.5">
+                        {open ? <ChevronDown className="h-3.5 w-3.5 text-slate-400" /> : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />}
+                        {format(new Date(l.created_at), 'MMM d, yyyy')}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">
+                      {l.employee_name}
+                      {l.employee_role && <span className="block text-[11px] text-slate-400">{l.employee_role}</span>}
+                    </td>
+                    <td className="px-4 py-3 text-slate-500 text-xs max-w-xs truncate">{l.reason ?? l.reference ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      <Badge className={cn('capitalize text-[10px]', STATUS_BADGE[l.status])}>{l.status}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-slate-600">{fmt(l.original_amount)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-bold text-amber-700">{fmt(l.outstanding_balance)}</td>
+                    <td className="px-4 py-3 text-right">
+                      {canWrite && l.status !== 'settled' && (
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1 border-emerald-200 text-emerald-700"
+                          onClick={(e) => { e.stopPropagation(); setSettleTarget(l); }}>
+                          <ArrowDownLeft className="h-3 w-3" /> Repay
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                  {open && (
+                    <tr className="bg-slate-50/60 dark:bg-slate-800/30">
+                      <td colSpan={7} className="px-4 py-3">
+                        <HistoryTimeline
+                          createdAt={l.created_at} original={l.original_amount}
+                          payments={l.payments ?? []} fmt={fmt} disburseLabel="Loan given to employee"
+                          repayLabel="Repayment received" accent="emerald"
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+                );
+              })}
+              {segment === 'supplier' && supAdvances.map((a) => {
+                const open = expandedId === a.id;
+                return (
+                <Fragment key={a.id}>
+                  <tr
+                    className="hover:bg-slate-50/80 dark:hover:bg-slate-800/50 cursor-pointer"
+                    onClick={() => setExpandedId(open ? null : a.id)}
+                  >
+                    <td className="px-4 py-3 text-xs text-slate-500 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1.5">
+                        {open ? <ChevronDown className="h-3.5 w-3.5 text-slate-400" /> : <ChevronRight className="h-3.5 w-3.5 text-slate-400" />}
+                        {format(new Date(a.created_at), 'MMM d, yyyy')}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 font-medium text-slate-800 dark:text-slate-200">{a.supplier_name}</td>
+                    <td className="px-4 py-3 text-slate-500 text-xs max-w-xs truncate">{a.reason ?? a.reference ?? '—'}</td>
+                    <td className="px-4 py-3">
+                      <Badge className={cn('capitalize text-[10px]', STATUS_BADGE[a.status])}>{a.status}</Badge>
+                    </td>
+                    <td className="px-4 py-3 text-right tabular-nums text-slate-600">{fmt(a.original_amount)}</td>
+                    <td className="px-4 py-3 text-right tabular-nums font-bold text-amber-700">{fmt(a.outstanding_balance)}</td>
+                    <td className="px-4 py-3 text-right">
+                      {canWrite && a.status !== 'settled' && (
+                        <Button size="sm" variant="outline" className="h-7 text-xs gap-1 border-sky-200 text-sky-700"
+                          onClick={(e) => { e.stopPropagation(); setSettleTarget(a); }}>
+                          <ArrowDownLeft className="h-3 w-3" /> Settle
+                        </Button>
+                      )}
+                    </td>
+                  </tr>
+                  {open && (
+                    <tr className="bg-slate-50/60 dark:bg-slate-800/30">
+                      <td colSpan={7} className="px-4 py-3">
+                        <HistoryTimeline
+                          createdAt={a.created_at} original={a.original_amount}
+                          payments={a.payments ?? []} fmt={fmt} disburseLabel="Advance paid to supplier"
+                          repayLabel="Settled / drawn down" accent="sky"
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
+                );
+              })}
               {((segment === 'employee' && empLoans.length === 0) ||
                 (segment === 'supplier' && supAdvances.length === 0)) && (
                 <tr>
@@ -217,6 +266,67 @@ export function LoansAdvancesTab() {
           }}
         />
       )}
+    </div>
+  );
+}
+
+// ── History timeline (disbursement + every repayment/settlement) ────────────
+function HistoryTimeline({
+  createdAt, original, payments, fmt, disburseLabel, repayLabel, accent,
+}: {
+  createdAt: string;
+  original: number;
+  payments: { id: string; amount: number; payment_method: string; created_at: string; reference?: string; notes?: string }[];
+  fmt: (n: number) => string;
+  disburseLabel: string;
+  repayLabel: string;
+  accent: 'emerald' | 'sky';
+}) {
+  const dot = accent === 'emerald' ? 'bg-emerald-500' : 'bg-sky-500';
+  let running = original;
+  const events = [
+    { kind: 'disburse' as const, amount: original, method: '', date: createdAt, reference: undefined as string | undefined, balance: original },
+    ...payments.map((p) => {
+      running = Math.max(0, running - p.amount);
+      return { kind: 'repay' as const, amount: p.amount, method: p.payment_method, date: p.created_at, reference: p.reference, balance: running };
+    }),
+  ];
+
+  return (
+    <div className="pl-1">
+      <div className="flex items-center gap-1.5 mb-2 text-xs font-semibold text-slate-500">
+        <History className="h-3.5 w-3.5" /> Activity history
+      </div>
+      <ol className="relative ml-2 border-l border-slate-200 dark:border-slate-700 space-y-3">
+        {events.map((e, i) => (
+          <li key={i} className="ml-4">
+            <span className={cn('absolute -left-[5px] mt-1 h-2.5 w-2.5 rounded-full',
+              e.kind === 'disburse' ? dot : 'bg-slate-300')} />
+            <div className="flex items-center justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-medium text-slate-700 dark:text-slate-200">
+                  {e.kind === 'disburse' ? disburseLabel : repayLabel}
+                  {e.method && <span className="ml-1 text-slate-400 capitalize">· {e.method.replace(/_/g, ' ')}</span>}
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  {format(new Date(e.date), 'MMM d, yyyy · HH:mm')}
+                  {e.reference && <span className="ml-1">#{e.reference}</span>}
+                </p>
+              </div>
+              <div className="text-right shrink-0">
+                <p className={cn('text-xs font-semibold tabular-nums',
+                  e.kind === 'disburse' ? 'text-amber-700' : 'text-emerald-700')}>
+                  {e.kind === 'disburse' ? '' : '− '}{fmt(e.amount)}
+                </p>
+                <p className="text-[10px] text-slate-400 tabular-nums">bal {fmt(e.balance)}</p>
+              </div>
+            </div>
+          </li>
+        ))}
+        {payments.length === 0 && (
+          <li className="ml-4 text-[11px] text-slate-400">No repayments yet</li>
+        )}
+      </ol>
     </div>
   );
 }

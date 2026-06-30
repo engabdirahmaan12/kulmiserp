@@ -334,7 +334,12 @@ BEGIN
   SELECT jsonb_agg(row_to_json(r) ORDER BY r.created_at DESC)
   INTO v_rows
   FROM (
-    SELECT el.*, e.full_name AS employee_name, e.role_title AS employee_role
+    SELECT el.*, e.full_name AS employee_name, e.role_title AS employee_role,
+      COALESCE(
+        (SELECT jsonb_agg(row_to_json(p) ORDER BY p.created_at)
+         FROM employee_loan_payments p WHERE p.loan_id = el.id),
+        '[]'::jsonb
+      ) AS payments
     FROM employee_loans el
     JOIN employees e ON e.id = el.employee_id
     WHERE el.store_id = p_store_id
@@ -560,7 +565,12 @@ BEGIN
   SELECT jsonb_agg(row_to_json(r) ORDER BY r.created_at DESC)
   INTO v_rows
   FROM (
-    SELECT sa.*, sup.name AS supplier_name
+    SELECT sa.*, sup.name AS supplier_name,
+      COALESCE(
+        (SELECT jsonb_agg(row_to_json(p) ORDER BY p.created_at)
+         FROM supplier_advance_payments p WHERE p.advance_id = sa.id),
+        '[]'::jsonb
+      ) AS payments
     FROM supplier_advances sa
     JOIN suppliers sup ON sup.id = sa.supplier_id
     WHERE sa.store_id = p_store_id
