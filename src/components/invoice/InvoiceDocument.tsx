@@ -343,39 +343,39 @@ function CorporateLayout({
     >
       {/* ── Header ── */}
       <div className={cn('text-white', tc.headerBg, compact ? 'px-4 py-4' : 'px-8 py-7')}>
-        <div className={cn('flex gap-4', compact ? 'flex-col' : 'items-start justify-between')}>
-          <div className="flex items-start gap-3 min-w-0">
+        <div className={cn('flex gap-4', compact ? 'flex-col' : 'items-center justify-between gap-6')}>
+          <div className={cn('flex min-w-0', compact ? 'items-start gap-3' : 'items-center gap-5')}>
             {opts.showLogo !== false && data.logo_url ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={data.logo_url} alt="" className={cn('rounded-xl object-cover border-2 border-white/30 shadow-lg shrink-0', compact ? 'h-11 w-11' : 'h-16 w-16')} />
+              <img src={data.logo_url} alt="" className={cn('rounded-2xl object-cover border-2 border-white/35 shadow-lg shrink-0', compact ? 'h-12 w-12' : 'h-20 w-20')} />
             ) : (
-              <div className={cn('rounded-xl bg-white/20 border-2 border-white/30 flex items-center justify-center font-black shrink-0', compact ? 'h-11 w-11 text-xl' : 'h-16 w-16 text-3xl')}>
+              <div className={cn('rounded-2xl bg-white/20 border-2 border-white/35 flex items-center justify-center font-black shrink-0 shadow-lg', compact ? 'h-12 w-12 text-2xl' : 'h-20 w-20 text-4xl')}>
                 {data.store_name.charAt(0)}
               </div>
             )}
             <div className="min-w-0">
-              <h2 className={cn('font-black tracking-tight truncate', compact ? 'text-lg' : 'text-2xl')}>{data.store_name}</h2>
-              {data.store_address && <p className="text-white/70 text-xs mt-0.5 line-clamp-2">{data.store_address}</p>}
-              {data.store_phone && <p className="text-white/70 text-xs">{data.store_phone}</p>}
-              {!compact && data.store_email && <p className="text-white/70 text-xs">{data.store_email}</p>}
+              <h2 className={cn('font-black tracking-tight truncate leading-tight', compact ? 'text-xl' : 'text-3xl')}>{data.store_name}</h2>
+              {data.store_address && <p className={cn('text-white/80 mt-1 line-clamp-2', compact ? 'text-xs' : 'text-sm')}>{data.store_address}</p>}
+              {data.store_phone && <p className={cn('text-white/80', compact ? 'text-xs' : 'text-sm mt-0.5')}>📞 {data.store_phone}</p>}
+              {!compact && data.store_email && <p className="text-white/80 text-sm mt-0.5">✉ {data.store_email}</p>}
               {!compact && (data.tax_number ?? opts.taxNumber) && (
-                <p className="text-white/50 text-[10px] mt-1">Tax ID: {data.tax_number ?? opts.taxNumber}</p>
+                <p className="text-white/55 text-[11px] mt-1">Tax ID: {data.tax_number ?? opts.taxNumber}</p>
               )}
             </div>
           </div>
           <div className={cn(compact ? 'flex items-center justify-between gap-2 pt-1 border-t border-white/20' : 'text-right shrink-0')}>
-            <div className={compact ? '' : ''}>
-              <span className="inline-block rounded-full bg-white/20 border border-white/30 text-[10px] font-black px-2.5 py-0.5 uppercase tracking-widest">
+            <div>
+              <span className="inline-block rounded-full bg-white/20 border border-white/30 text-[10px] font-black px-3 py-1 uppercase tracking-widest">
                 {typeLabel}
               </span>
-              <p className={cn('font-black mt-1', compact ? 'text-lg' : 'text-2xl')}>{data.invoice_number}</p>
-              <p className="text-white/60 text-xs">
+              <p className={cn('font-black mt-1.5 tracking-tight', compact ? 'text-xl' : 'text-3xl')}>{data.invoice_number}</p>
+              <p className={cn('text-white/70 mt-0.5', compact ? 'text-xs' : 'text-sm')}>
                 {formatDate(data.date)}
                 {' · '}
                 {new Date(data.date).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}
               </p>
             </div>
-            <Badge className={cn('border text-[10px] font-bold shrink-0', STATUS_BADGE[paymentStatus])}>
+            <Badge className={cn('border text-[10px] font-bold shrink-0', !compact && 'mt-2 text-xs px-3 py-1', STATUS_BADGE[paymentStatus])}>
               {statusLabel}
             </Badge>
           </div>

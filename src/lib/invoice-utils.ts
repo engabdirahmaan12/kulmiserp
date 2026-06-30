@@ -204,8 +204,8 @@ export function buildInvoiceHtml(data: InvoiceData, options: InvoiceDisplayOptio
   const paymentStatus = data.payment_status ?? (balanceDue > 0 ? 'partial' : 'paid');
 
   const logoHtml = (showLogo && data.logo_url)
-    ? `<img src="${data.logo_url}" alt="Logo" style="height:60px;width:60px;border-radius:10px;object-fit:cover;border:2px solid rgba(255,255,255,0.3);" />`
-    : `<div style="height:60px;width:60px;border-radius:10px;background:rgba(255,255,255,0.2);border:2px solid rgba(255,255,255,0.3);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:900;color:white;">${data.store_name.charAt(0)}</div>`;
+    ? `<img src="${data.logo_url}" alt="Logo" style="height:84px;width:84px;border-radius:16px;object-fit:cover;border:3px solid rgba(255,255,255,0.35);box-shadow:0 4px 12px rgba(0,0,0,0.18);" />`
+    : `<div style="height:84px;width:84px;border-radius:16px;background:rgba(255,255,255,0.2);border:3px solid rgba(255,255,255,0.35);display:flex;align-items:center;justify-content:center;font-size:38px;font-weight:900;color:white;box-shadow:0 4px 12px rgba(0,0,0,0.18);">${data.store_name.charAt(0)}</div>`;
 
   const statusColor = paymentStatus === 'paid' ? '#16a34a' : paymentStatus === 'partial' ? '#d97706' : '#dc2626';
   const statusBg = paymentStatus === 'paid' ? '#f0fdf4' : paymentStatus === 'partial' ? '#fffbeb' : '#fef2f2';
@@ -248,24 +248,24 @@ export function buildInvoiceHtml(data: InvoiceData, options: InvoiceDisplayOptio
 <div style="max-width:794px;margin:0 auto;background:#fff;min-height:1123px;position:relative;">
 
   <!-- HEADER -->
-  <div style="background:linear-gradient(135deg,${colors.header} 0%,${colors.primary} 100%);padding:32px 40px;display:flex;justify-content:space-between;align-items:flex-start;">
-    <div style="display:flex;align-items:flex-start;gap:16px;">
+  <div style="background:linear-gradient(135deg,${colors.header} 0%,${colors.primary} 100%);padding:34px 40px;display:flex;justify-content:space-between;align-items:center;gap:24px;">
+    <div style="display:flex;align-items:center;gap:20px;min-width:0;">
       ${logoHtml}
-      <div>
-        <div style="font-size:22px;font-weight:900;color:#fff;letter-spacing:-0.5px;">${escHtml(data.store_name)}</div>
-        ${data.store_address ? `<div style="font-size:11px;color:rgba(255,255,255,0.75);margin-top:4px;">${escHtml(data.store_address)}</div>` : ''}
-        ${data.store_phone ? `<div style="font-size:11px;color:rgba(255,255,255,0.75);">${escHtml(data.store_phone)}</div>` : ''}
-        ${data.store_email ? `<div style="font-size:11px;color:rgba(255,255,255,0.75);">${escHtml(data.store_email)}</div>` : ''}
-        ${data.tax_number ?? options.taxNumber ? `<div style="font-size:10px;color:rgba(255,255,255,0.6);margin-top:3px;">Tax ID: ${escHtml(data.tax_number ?? options.taxNumber ?? '')}</div>` : ''}
+      <div style="min-width:0;">
+        <div style="font-size:30px;font-weight:900;color:#fff;letter-spacing:-0.5px;line-height:1.1;">${escHtml(data.store_name)}</div>
+        ${data.store_address ? `<div style="font-size:13px;color:rgba(255,255,255,0.85);margin-top:6px;">${escHtml(data.store_address)}</div>` : ''}
+        ${data.store_phone ? `<div style="font-size:13px;color:rgba(255,255,255,0.85);margin-top:2px;">📞 ${escHtml(data.store_phone)}</div>` : ''}
+        ${data.store_email ? `<div style="font-size:13px;color:rgba(255,255,255,0.85);margin-top:2px;">✉ ${escHtml(data.store_email)}</div>` : ''}
+        ${data.tax_number ?? options.taxNumber ? `<div style="font-size:11px;color:rgba(255,255,255,0.65);margin-top:4px;">Tax ID: ${escHtml(data.tax_number ?? options.taxNumber ?? '')}</div>` : ''}
       </div>
     </div>
-    <div style="text-align:right;">
-      <div style="display:inline-block;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:4px 12px;font-size:10px;font-weight:700;color:rgba(255,255,255,0.9);letter-spacing:1px;text-transform:uppercase;margin-bottom:8px;">${escHtml(typeLabel)}</div>
-      <div style="font-size:22px;font-weight:900;color:#fff;">${escHtml(data.invoice_number)}</div>
-      <div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:4px;">${escHtml(dateStr)}</div>
-      ${data.cashier_name ? `<div style="font-size:11px;color:rgba(255,255,255,0.7);margin-top:2px;">Cashier: ${escHtml(data.cashier_name)}</div>` : ''}
-      <div style="margin-top:8px;">
-        <span style="background:${statusBg};color:${statusColor};border:1px solid ${statusColor}33;border-radius:20px;padding:3px 12px;font-size:11px;font-weight:700;letter-spacing:0.5px;">${statusLabel}</span>
+    <div style="text-align:right;flex-shrink:0;">
+      <div style="display:inline-block;background:rgba(255,255,255,0.15);border:1px solid rgba(255,255,255,0.3);border-radius:6px;padding:5px 14px;font-size:11px;font-weight:700;color:rgba(255,255,255,0.95);letter-spacing:1.2px;text-transform:uppercase;margin-bottom:10px;">${escHtml(typeLabel)}</div>
+      <div style="font-size:28px;font-weight:900;color:#fff;letter-spacing:-0.5px;">${escHtml(data.invoice_number)}</div>
+      <div style="font-size:12px;color:rgba(255,255,255,0.8);margin-top:5px;">${escHtml(dateStr)}</div>
+      ${data.cashier_name ? `<div style="font-size:12px;color:rgba(255,255,255,0.8);margin-top:2px;">Cashier: ${escHtml(data.cashier_name)}</div>` : ''}
+      <div style="margin-top:10px;">
+        <span style="background:${statusBg};color:${statusColor};border:1px solid ${statusColor}33;border-radius:20px;padding:4px 14px;font-size:12px;font-weight:700;letter-spacing:0.5px;">${statusLabel}</span>
       </div>
     </div>
   </div>
