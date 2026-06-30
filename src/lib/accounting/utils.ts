@@ -7,6 +7,11 @@ export const PAYMENT_ACCOUNT_CODES = [
   '1110', '1120', '1130', '1140', '1150', '1160', '1165', '1170',
 ] as const;
 
+/** Physical cash drawer */
+export const CASH_ON_HAND_CODE = '1110' as const;
+/** Mobile money wallets: WAAFI, EVC, Sahal, Zaad */
+export const MOBILE_MONEY_CODES = ['1120', '1130', '1140', '1150'] as const;
+/** Bank accounts: Salaam, Premier, Dahabshiil */
 export const BANK_ACCOUNT_CODES = ['1160', '1165', '1170'] as const;
 
 export function isDebitNormal(type: AccountType): boolean {

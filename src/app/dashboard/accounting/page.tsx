@@ -29,6 +29,7 @@ import {
   AccountingNavSidebar,
   AccountingNavMobile,
   AccountingFinancialHeader,
+  ADVANCED_ACCOUNTING_TABS,
   type AccountingTabId,
 } from '@/components/accounting/AccountingNavSidebar';
 import { PageShell } from '@/components/layout/PageShell';
@@ -87,7 +88,8 @@ function AccountingPageInner() {
   }
 
   const writeOnlyTabs: AccountingTabId[] = [
-    'accounts', 'expenses', 'payroll', 'periods', 'currency', 'settings', 'valuation', 'receivables', 'payables', 'transfers', 'loans',
+    'accounts', 'expenses', 'valuation', 'receivables', 'payables', 'transfers', 'loans',
+    ...ADVANCED_ACCOUNTING_TABS,
   ];
   const effectiveTab = !canWrite && writeOnlyTabs.includes(activeTab) ? 'dashboard' : activeTab;
 

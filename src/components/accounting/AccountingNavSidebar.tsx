@@ -59,56 +59,62 @@ interface NavItem {
 interface NavGroup {
   labelKey: string;
   items: NavItem[];
+  /** Advanced bookkeeping — only owners/accountants (write access) see this group */
+  advanced?: boolean;
 }
+
+/**
+ * Advanced bookkeeping tabs. Hidden from non-writers (managers, cashiers) in the
+ * sidebar and blocked by the page-level guard. Only owners & accountants reach these.
+ */
+export const ADVANCED_ACCOUNTING_TABS: AccountingTabId[] = [
+  'ledger', 'trial-balance', 'journals', 'audit', 'payroll', 'periods', 'currency', 'settings',
+];
 
 export const ACCOUNTING_NAV: NavGroup[] = [
   {
-    labelKey: 'accounting.navGroupBooks',
+    labelKey: 'accounting.navGroupAccounting',
     items: [
-      { id: 'dashboard', labelKey: 'accounting.tabDashboard', icon: LayoutDashboard },
-      { id: 'accounts', labelKey: 'accounting.tabAccounts', icon: BookMarked },
-      { id: 'journals', labelKey: 'accounting.tabJournals', icon: FileText },
-      { id: 'ledger', labelKey: 'accounting.tabLedger', icon: BookOpen },
-    ],
-  },
-  {
-    labelKey: 'accounting.navGroupCash',
-    items: [
-      { id: 'payments',   labelKey: 'accounting.tabPayments',   icon: Wallet         },
-      { id: 'transfers',  labelKey: 'accounting.tabTransfers',  icon: ArrowLeftRight },
-      { id: 'loans',      labelKey: 'accounting.tabLoans',      icon: HandCoins      },
-      { id: 'expenses',   labelKey: 'accounting.tabExpenses',   icon: Receipt        },
-      { id: 'receivables',labelKey: 'accounting.tabReceivables',icon: Users          },
-      { id: 'payables',   labelKey: 'accounting.tabPayables',   icon: Building2      },
+      { id: 'dashboard',   labelKey: 'accounting.tabDashboard',   icon: LayoutDashboard },
+      { id: 'accounts',    labelKey: 'accounting.tabAccounts',    icon: BookMarked      },
+      { id: 'payments',    labelKey: 'accounting.tabPayments',    icon: Wallet          },
+      { id: 'transfers',   labelKey: 'accounting.tabTransfers',   icon: ArrowLeftRight  },
+      { id: 'receivables', labelKey: 'accounting.tabReceivables', icon: Users           },
+      { id: 'payables',    labelKey: 'accounting.tabPayables',    icon: Building2       },
+      { id: 'expenses',    labelKey: 'accounting.tabExpenses',    icon: Receipt         },
+      { id: 'loans',       labelKey: 'accounting.tabLoans',       icon: HandCoins       },
     ],
   },
   {
     labelKey: 'accounting.navGroupReports',
     items: [
-      { id: 'trial-balance', labelKey: 'accounting.tabTrialBalance', icon: ListChecks },
-      { id: 'pnl', labelKey: 'accounting.tabPnl', icon: TrendingUp },
+      { id: 'pnl',           labelKey: 'accounting.tabPnl',          icon: TrendingUp },
+      { id: 'cash-flow',     labelKey: 'accounting.tabCashFlow',     icon: ArrowLeftRight },
       { id: 'balance-sheet', labelKey: 'accounting.tabBalanceSheet', icon: Scale },
-      { id: 'cash-flow', labelKey: 'accounting.tabCashFlow', icon: ArrowLeftRight },
+      { id: 'valuation',     labelKey: 'accounting.tabValuation',    icon: Package },
     ],
   },
   {
-    labelKey: 'accounting.navGroupMore',
+    labelKey: 'accounting.navGroupAdvanced',
+    advanced: true,
     items: [
-      { id: 'payroll', labelKey: 'accounting.tabPayroll', icon: Banknote },
-      { id: 'valuation', labelKey: 'accounting.tabValuation', icon: Package },
-      { id: 'settings', labelKey: 'accounting.tabSettings', icon: Settings2 },
-      { id: 'currency', labelKey: 'accounting.tabCurrency', icon: Coins },
-      { id: 'periods', labelKey: 'accounting.tabPeriods', icon: Lock },
-      { id: 'audit', labelKey: 'accounting.tabAudit', icon: Shield },
+      { id: 'ledger',        labelKey: 'accounting.tabLedger',       icon: BookOpen    },
+      { id: 'trial-balance', labelKey: 'accounting.tabTrialBalance', icon: ListChecks  },
+      { id: 'journals',      labelKey: 'accounting.tabJournals',     icon: FileText    },
+      { id: 'audit',         labelKey: 'accounting.tabAudit',        icon: Shield      },
+      { id: 'payroll',       labelKey: 'accounting.tabPayroll',      icon: Banknote    },
+      { id: 'periods',       labelKey: 'accounting.tabPeriods',      icon: Lock        },
+      { id: 'currency',      labelKey: 'accounting.tabCurrency',     icon: Coins       },
+      { id: 'settings',      labelKey: 'accounting.tabSettings',     icon: Settings2   },
     ],
   },
 ];
 
 export const ACCOUNTING_QUICK_PILLS: { id: AccountingTabId; labelKey: string }[] = [
-  { id: 'trial-balance', labelKey: 'accounting.tabTrialBalance' },
+  { id: 'dashboard', labelKey: 'accounting.tabDashboard' },
   { id: 'pnl', labelKey: 'accounting.pillPnl' },
+  { id: 'cash-flow', labelKey: 'accounting.tabCashFlow' },
   { id: 'balance-sheet', labelKey: 'accounting.tabBalanceSheet' },
-  { id: 'journals', labelKey: 'accounting.pillJournals' },
 ];
 
 export function getAccountingTabMeta(id: AccountingTabId): NavItem {
@@ -189,6 +195,17 @@ export const ACCOUNTING_WRITE_TABS: AccountingTabId[] = [
   'accounts', 'expenses', 'payroll', 'valuation', 'currency', 'periods', 'receivables', 'payables',
 ];
 
+/** Groups + items visible for the current access level. Advanced groups are
+ *  hidden entirely from non-writers (managers/cashiers); write-only items are
+ *  filtered out of the remaining groups. */
+function visibleNavGroups(readOnly: boolean): NavGroup[] {
+  if (!readOnly) return ACCOUNTING_NAV;
+  return ACCOUNTING_NAV
+    .filter((g) => !g.advanced)
+    .map((g) => ({ ...g, items: g.items.filter((i) => !ACCOUNTING_WRITE_TABS.includes(i.id)) }))
+    .filter((g) => g.items.length > 0);
+}
+
 export function AccountingNavSidebar({
   active,
   onChange,
@@ -201,12 +218,7 @@ export function AccountingNavSidebar({
   readOnly?: boolean;
 }) {
   const { t } = useTranslation();
-  const navGroups = readOnly
-    ? ACCOUNTING_NAV.map((g) => ({
-        ...g,
-        items: g.items.filter((i) => !ACCOUNTING_WRITE_TABS.includes(i.id)),
-      })).filter((g) => g.items.length > 0)
-    : ACCOUNTING_NAV;
+  const navGroups = visibleNavGroups(readOnly);
 
   return (
     <aside
@@ -267,13 +279,7 @@ export function AccountingNavMobile({
   readOnly?: boolean;
 }) {
   const { t } = useTranslation();
-  const flat = (readOnly
-    ? ACCOUNTING_NAV.map((g) => ({
-        ...g,
-        items: g.items.filter((i) => !ACCOUNTING_WRITE_TABS.includes(i.id)),
-      }))
-    : ACCOUNTING_NAV
-  ).flatMap((g) => g.items);
+  const flat = visibleNavGroups(readOnly).flatMap((g) => g.items);
   const activeItem = flat.find((i) => i.id === active);
   const activeLabel = activeItem ? t(activeItem.labelKey) : t('accounting.title');
 

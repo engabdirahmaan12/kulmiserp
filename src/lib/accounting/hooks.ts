@@ -10,6 +10,9 @@ import {
   normalBalance,
   sumAccountsByType,
   PAYMENT_ACCOUNT_CODES,
+  CASH_ON_HAND_CODE,
+  MOBILE_MONEY_CODES,
+  BANK_ACCOUNT_CODES,
 } from './utils';
 import { ACCOUNTING_QUERY_KEYS } from './permissions';
 
@@ -45,7 +48,15 @@ export function useAccountingAccounts(options?: { includeArchived?: boolean }) {
       (s, code) => s + normalBalance(getAccountByCode(accounts, code) ?? { balance: 0, account_type: 'asset' }),
       0,
     ),
-    bankBalance: normalBalance(getAccountByCode(accounts, '1120') ?? { balance: 0, account_type: 'asset' }),
+    cashOnHand: normalBalance(getAccountByCode(accounts, CASH_ON_HAND_CODE) ?? { balance: 0, account_type: 'asset' }),
+    mobileMoneyBalance: MOBILE_MONEY_CODES.reduce(
+      (s, code) => s + normalBalance(getAccountByCode(accounts, code) ?? { balance: 0, account_type: 'asset' }),
+      0,
+    ),
+    bankBalance: BANK_ACCOUNT_CODES.reduce(
+      (s, code) => s + normalBalance(getAccountByCode(accounts, code) ?? { balance: 0, account_type: 'asset' }),
+      0,
+    ),
     accountsReceivable: normalBalance(getAccountByCode(accounts, '1200') ?? { balance: 0, account_type: 'asset' }),
     accountsPayable: normalBalance(getAccountByCode(accounts, '2100') ?? { balance: 0, account_type: 'liability' }),
     inventoryValue: normalBalance(getAccountByCode(accounts, '1300') ?? { balance: 0, account_type: 'asset' }),

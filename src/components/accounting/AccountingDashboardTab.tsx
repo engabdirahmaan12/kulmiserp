@@ -17,12 +17,13 @@ import {
   DollarSign,
   TrendingUp,
   Wallet,
-  Package,
   Users,
   Building2,
   ArrowDownRight,
+  Landmark,
+  Smartphone,
 } from 'lucide-react';
-import { format, startOfMonth, subMonths } from 'date-fns';
+import { format, subMonths } from 'date-fns';
 import { useAccountingAccounts } from '@/lib/accounting/hooks';
 import { ReportKpiGrid, ReportKpiCard, ReportWidget } from '@/components/reports/ReportLayout';
 import { ChartTooltip, GradientDefs, PALETTE } from '@/lib/chart-utils';
@@ -36,8 +37,6 @@ export function AccountingDashboardTab() {
 
   const fmtC = (n: number) =>
     new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 0 }).format(n);
-
-  const monthStart = startOfMonth(new Date()).toISOString().split('T')[0];
 
   const { data: monthlySales = [] } = useQuery({
     queryKey: ['accounting-monthly-sales', currentStore?.id],
@@ -91,10 +90,6 @@ export function AccountingDashboardTab() {
     }));
   }, [monthlySales, monthlyExpenses]);
 
-  const mtdRevenue = monthlySales
-    .filter((s) => s.sale_date >= monthStart)
-    .reduce((sum, s) => sum + s.total_amount, 0);
-
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -113,14 +108,14 @@ export function AccountingDashboardTab() {
       <AccountingIntegrationFeed />
 
       <ReportKpiGrid className="grid-cols-2 lg:grid-cols-4">
-        <ReportKpiCard label={t('accountingDash.kpiTotalRevenue')} value={fmtC(metrics.totalRevenue)} icon={DollarSign} accent="blue" />
-        <ReportKpiCard label={t('accountingDash.kpiNetProfit')} value={fmtC(metrics.netProfit)} icon={TrendingUp} accent={metrics.netProfit >= 0 ? 'blue' : 'rose'} />
-        <ReportKpiCard label={t('accountingDash.kpiExpensesCogs')} value={fmtC(metrics.totalExpenses)} icon={ArrowDownRight} accent="orange" />
-        <ReportKpiCard label={t('accountingDash.kpiMtdSales')} value={fmtC(mtdRevenue)} icon={DollarSign} accent="blue" />
-        <ReportKpiCard label={t('accountingDash.kpiCashBalance')} value={fmtC(metrics.cashBalance)} icon={Wallet} accent="violet" />
+        <ReportKpiCard label={t('accountingDash.kpiCashBalance')} value={fmtC(metrics.cashOnHand)} icon={Wallet} accent="violet" />
+        <ReportKpiCard label={t('accountingDash.kpiBankBalance')} value={fmtC(metrics.bankBalance)} icon={Landmark} accent="blue" />
+        <ReportKpiCard label={t('accountingDash.kpiMobileMoney')} value={fmtC(metrics.mobileMoneyBalance)} icon={Smartphone} accent="violet" />
+        <ReportKpiCard label={t('accountingDash.kpiProfit')} value={fmtC(metrics.netProfit)} icon={TrendingUp} accent={metrics.netProfit >= 0 ? 'blue' : 'rose'} />
+        <ReportKpiCard label={t('accountingDash.kpiRevenue')} value={fmtC(metrics.totalRevenue)} icon={DollarSign} accent="blue" />
+        <ReportKpiCard label={t('accountingDash.kpiExpenses')} value={fmtC(metrics.totalExpenses)} icon={ArrowDownRight} accent="orange" />
         <ReportKpiCard label={t('accountingDash.kpiAccountsReceivable')} value={fmtC(metrics.accountsReceivable)} icon={Users} accent="blue" />
         <ReportKpiCard label={t('accountingDash.kpiAccountsPayable')} value={fmtC(metrics.accountsPayable)} icon={Building2} accent="rose" />
-        <ReportKpiCard label={t('accountingDash.kpiInventoryValue')} value={fmtC(metrics.inventoryValue)} icon={Package} accent="blue" />
       </ReportKpiGrid>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_280px] gap-4 items-stretch">
@@ -133,8 +128,8 @@ export function AccountingDashboardTab() {
                   <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickLine={false} axisLine={false} tickFormatter={(v) => (v >= 1000 ? `${(v / 1000).toFixed(0)}k` : String(v))} />
                   <Tooltip content={<ChartTooltip formatter={fmtC} />} />
-                  <Area type="monotone" dataKey="revenue" name={t('accountingDash.kpiTotalRevenue')} stroke={PALETTE.blue} fill="url(#grad-blue)" strokeWidth={2} dot={false} />
-                  <Area type="monotone" dataKey="profit" name={t('accountingDash.kpiNetProfit')} stroke={PALETTE.blue} fill="url(#grad-blue)" strokeWidth={2} dot={false} />
+                  <Area type="monotone" dataKey="revenue" name={t('accountingDash.kpiRevenue')} stroke={PALETTE.blue} fill="url(#grad-blue)" strokeWidth={2} dot={false} />
+                  <Area type="monotone" dataKey="expenses" name={t('accountingDash.kpiExpenses')} stroke={PALETTE.orange} fill="url(#grad-orange)" strokeWidth={2} dot={false} />
                 </AreaChart>
               </ResponsiveContainer>
             </div>
