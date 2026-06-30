@@ -119,7 +119,7 @@ export function CartPanel({ products = [] }: { products?: Product[] }) {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
         <h3 className="font-semibold text-slate-900 flex items-center gap-2">
           <ShoppingCart className="h-4 w-4 text-indigo-600" />
@@ -175,7 +175,7 @@ export function CartPanel({ products = [] }: { products?: Product[] }) {
         )}
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 min-h-0">
         {items.length === 0 ? (
           <div className="flex h-40 flex-col items-center justify-center gap-2 text-slate-400">
             <ShoppingCart className="h-8 w-8 opacity-30" />
@@ -250,7 +250,7 @@ export function CartPanel({ products = [] }: { products?: Product[] }) {
       </ScrollArea>
 
       {items.length > 0 && (
-        <div className="border-t border-slate-100 px-4 py-2">
+        <div className="border-t border-slate-100 px-4 py-2 shrink-0">
           {showDiscount ? (
             <div className="flex gap-2">
               <Input
@@ -300,7 +300,7 @@ export function CartPanel({ products = [] }: { products?: Product[] }) {
       )}
 
       {items.length > 0 && (
-        <div className="border-t border-slate-200 px-4 py-3 space-y-1.5">
+        <div className="border-t border-slate-200 px-4 py-3 space-y-1.5 shrink-0">
           <div className="flex justify-between text-sm text-slate-600">
             <span>{t('pos.subtotal')}</span>
             <span>{currency} {fmt(subtotal)}</span>
@@ -325,7 +325,7 @@ export function CartPanel({ products = [] }: { products?: Product[] }) {
         </div>
       )}
 
-      <div className="border-t border-slate-200 p-4">
+      <div className="border-t border-slate-200 p-4 shrink-0 bg-white">
         <Button
           className="w-full h-12 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white text-base font-semibold shadow-md shadow-emerald-200/40 rounded-xl"
           disabled={items.length === 0}

@@ -383,7 +383,7 @@ export default function PosSystem() {
         </div>
 
         <div className={cn(
-          'border-l border-slate-200 bg-white flex flex-col',
+          'border-l border-slate-200 bg-white flex flex-col min-h-0 overflow-hidden',
           'w-full md:w-80 lg:w-96',
           mobileView === 'products' && 'hidden md:flex'
         )}>
