@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { answerCopilotQuery } from '@/lib/intelligence/copilot';
 import { buildCopilotContext } from '@/lib/intelligence/context';
+import { isSomaliQuery } from '@/lib/intelligence/query-language';
 import { estimateTokens, logAiUsage } from '@/lib/platform/log-ai-usage';
 import type { StoreIntelligence } from '@/lib/intelligence/types';
 
@@ -84,7 +85,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
-    const fallback = answerCopilotQuery(body.query, body.intelligence, body.currency, body.storeName);
+    // A Somali question always gets a Somali answer, regardless of which UI
+    // language happens to be selected — the store owner may not have touched
+    // the language switcher yet. Otherwise default the copilot to Somali
+    // (KULMIS's primary market) and follow the caller's explicit choice.
+    const queryIsSomali = isSomaliQuery(body.query);
+    const locale = queryIsSomali ? 'so' : (body.locale ?? 'so');
+
+    const fallback = answerCopilotQuery(body.query, body.intelligence, body.currency, body.storeName, locale);
     const context = buildCopilotContext(
       body.intelligence,
       body.storeName,
@@ -92,16 +100,16 @@ export async function POST(request: Request) {
       body.userName,
     );
 
-    const locale = body.locale ?? 'en';
     const languageInstruction =
       locale === 'so'
-        ? 'Respond ONLY in Somali (Af-Soomaali). Use clear, professional business Somali.'
+        ? 'Respond ONLY in Somali (Af-Soomaali). Use clear, professional business Somali. If the user\'s question is written in Somali, always answer in Somali even if earlier context was in another language.'
         : locale === 'ar'
           ? 'Respond ONLY in Arabic (العربية). Use clear, professional Modern Standard Arabic.'
           : 'Respond ONLY in English.';
 
     const system = `You are KULMIS AI, an expert ERP business copilot for "${body.storeName}".
 ${languageInstruction}
+IMPORTANT: Always match the language the user actually wrote their question in — if their message is in Somali, reply in Somali no matter what language was requested above.
 Answer ONLY using the store data JSON below. Currency: ${body.currency}.
 Be concise, actionable, and friendly. Use bullet points for lists.
 If data is missing, say so. Never invent numbers. Never reference other stores.

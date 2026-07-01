@@ -32,6 +32,7 @@ import { useAiCopilotStore } from '@/lib/stores/ai-copilot';
 import { useStoreIntelligence } from '@/lib/hooks/useIntelligence';
 import { useAuthStore } from '@/lib/stores/auth';
 import { answerCopilotQuery, quickActionQuery, runQuickReport } from '@/lib/intelligence/copilot';
+import { isSomaliQuery } from '@/lib/intelligence/query-language';
 import { cn } from '@/lib/utils';
 import type { ReportKind } from '@/lib/intelligence/types';
 import { useTranslation } from '@/lib/i18n/useTranslation';
@@ -228,6 +229,9 @@ export function KulmisAiCopilot() {
       if (!text.trim() || !data || !currentStore || thinking) return;
 
       const q = text.trim();
+      // A Somali question always gets a Somali answer, even if the UI
+      // language switcher is still set to English/Arabic.
+      const effectiveLocale = isSomaliQuery(q) ? 'so' : locale;
       setQuery('');
       addMessage({ role: 'user', content: q });
       setThinking(true);
@@ -245,12 +249,12 @@ export function KulmisAiCopilot() {
             intelligence: data,
             userName: user?.full_name,
             stream: true,
-            locale,
+            locale: effectiveLocale,
           }),
         });
 
         if (!res.ok || !res.body) {
-          const fallback = answerCopilotQuery(q, data, currency, currentStore.name);
+          const fallback = answerCopilotQuery(q, data, currency, currentStore.name, effectiveLocale);
           updateLastAssistant(fallback.answer, { actions: fallback.actions, source: 'rules' });
           return;
         }
@@ -270,7 +274,7 @@ export function KulmisAiCopilot() {
         const { content, actions, source } = parseStreamMeta(accumulated);
         updateLastAssistant(content, { actions, source });
       } catch {
-        const fallback = answerCopilotQuery(q, data, currency, currentStore.name);
+        const fallback = answerCopilotQuery(q, data, currency, currentStore.name, effectiveLocale);
         updateLastAssistant(fallback.answer, { actions: fallback.actions, source: 'rules' });
       } finally {
         setThinking(false);
@@ -282,7 +286,7 @@ export function KulmisAiCopilot() {
   const runQuick = (action: (typeof quickActions)[number]) => {
     if (!data || !currentStore) return;
     if (action.report) {
-      const res = runQuickReport(action.report, data, currency, currentStore.name);
+      const res = runQuickReport(action.report, data, currency, currentStore.name, locale);
       addMessage({ role: 'user', content: action.label });
       addMessage({ role: 'assistant', content: res.answer, actions: res.actions, source: 'rules' });
       return;

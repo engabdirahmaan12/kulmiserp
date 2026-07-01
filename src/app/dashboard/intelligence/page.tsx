@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useStoreIntelligence } from '@/lib/hooks/useIntelligence';
 import { useAuthStore } from '@/lib/stores/auth';
 import { answerCopilotQuery } from '@/lib/intelligence/copilot';
+import { isSomaliQuery } from '@/lib/intelligence/query-language';
 import { PageShell } from '@/components/layout/PageShell';
 import { ReportPageHeader, ReportKpiGrid, ReportKpiCard, ReportWidget } from '@/components/reports/ReportLayout';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -35,14 +36,17 @@ const SEGMENT_STYLE = {
 export default function IntelligencePage() {
   const { data, isLoading } = useStoreIntelligence();
   const { currentStore } = useAuthStore();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const currency = currentStore?.currency ?? 'USD';
   const [query, setQuery] = useState('');
   const [copilotHistory, setCopilotHistory] = useState<{ q: string; answer: string; actions?: { label: string; href: string }[] }[]>([]);
 
   const ask = () => {
     if (!query.trim() || !data) return;
-    const res = answerCopilotQuery(query, data, currency);
+    // A Somali question always gets a Somali answer, even if the UI
+    // language switcher is still set to English/Arabic.
+    const effectiveLocale = isSomaliQuery(query) ? 'so' : locale;
+    const res = answerCopilotQuery(query, data, currency, currentStore?.name, effectiveLocale);
     setCopilotHistory((h) => [{ q: query, ...res }, ...h].slice(0, 8));
     setQuery('');
   };
