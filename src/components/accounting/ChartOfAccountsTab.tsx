@@ -287,11 +287,11 @@ export function ChartOfAccountsTab() {
             placeholder={t('coa.searchPlaceholder')}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            className="h-10 pl-9"
           />
         </div>
         <Select value={typeFilter} onValueChange={(v) => setTypeFilter(v as AccountType | 'all')}>
-          <SelectTrigger className="w-full sm:w-44"><SelectValue /></SelectTrigger>
+          <SelectTrigger className="h-10 w-full sm:w-44"><SelectValue /></SelectTrigger>
           <SelectContent>
             {TYPE_FILTER_KEYS.map((f) => (
               <SelectItem key={f.value} value={f.value}>{t(f.labelKey as Parameters<typeof t>[0])}</SelectItem>

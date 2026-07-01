@@ -88,20 +88,21 @@ export function AccountWizardDialog({
 
         <div className="space-y-4 py-1">
           <div>
-            <Label htmlFor="coa-name">{t('accountWizard.labelName')}</Label>
+            <Label htmlFor="coa-name" className="text-sm font-medium text-slate-700">{t('accountWizard.labelName')}</Label>
             <Input
               id="coa-name"
               placeholder={t('accountWizard.namePlaceholder')}
               value={form.name}
               onChange={(e) => setForm({ ...form, name: e.target.value })}
-              className="mt-1"
+              className="mt-1.5 h-11"
+              autoFocus
             />
           </div>
 
           <div className="grid sm:grid-cols-2 gap-3">
             <div>
               <div className="flex items-center justify-between gap-2">
-                <Label htmlFor="coa-code">{t('accountWizard.labelNumber')}</Label>
+                <Label htmlFor="coa-code" className="text-sm font-medium text-slate-700">{t('accountWizard.labelNumber')}</Label>
                 <button
                   type="button"
                   className="text-[10px] font-semibold text-blue-600 hover:underline"
@@ -115,7 +116,7 @@ export function AccountWizardDialog({
                 placeholder="1010, BANK-001"
                 value={form.code}
                 onChange={(e) => setForm({ ...form, code: e.target.value })}
-                className={`mt-1 ${codeError || duplicate ? 'border-red-500' : ''}`}
+                className={`mt-1.5 h-11 ${codeError || duplicate ? 'border-red-500' : ''}`}
               />
               {codeError && <p className="text-xs text-red-500 mt-1">{codeError}</p>}
               {!codeError && duplicate && (
@@ -123,7 +124,7 @@ export function AccountWizardDialog({
               )}
             </div>
             <div>
-              <Label>{t('accountWizard.labelType')}</Label>
+              <Label className="text-sm font-medium text-slate-700">{t('accountWizard.labelType')}</Label>
               <Select
                 value={form.accountType}
                 disabled={lockAccountType}
@@ -136,7 +137,7 @@ export function AccountWizardDialog({
                   });
                 }}
               >
-                <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                <SelectTrigger className="mt-1.5 h-11 w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {WIZARD_ACCOUNT_TYPES.map(({ value, label }) => (
                     <SelectItem key={value} value={value}>{label}</SelectItem>
@@ -147,25 +148,25 @@ export function AccountWizardDialog({
           </div>
 
           <div>
-            <Label htmlFor="coa-desc">{t('accountWizard.labelDesc')} <span className="text-slate-400 font-normal">{t('accountWizard.descOptional')}</span></Label>
+            <Label htmlFor="coa-desc" className="text-sm font-medium text-slate-700">{t('accountWizard.labelDesc')} <span className="text-slate-400 font-normal">{t('accountWizard.descOptional')}</span></Label>
             <Textarea
               id="coa-desc"
               rows={2}
               placeholder={t('accountWizard.descPlaceholder')}
               value={form.description}
               onChange={(e) => setForm({ ...form, description: e.target.value })}
-              className="mt-1"
+              className="mt-1.5 resize-none"
             />
           </div>
 
           <div>
-            <Label>{t('accountWizard.labelParent')} <span className="text-slate-400 font-normal">{t('accountWizard.descOptional')}</span></Label>
+            <Label className="text-sm font-medium text-slate-700">{t('accountWizard.labelParent')} <span className="text-slate-400 font-normal">{t('accountWizard.descOptional')}</span></Label>
             <Select
               items={parentSelectItems}
               value={form.parentId || 'none'}
               onValueChange={(v) => setForm({ ...form, parentId: v === 'none' ? '' : v ?? '' })}
             >
-              <SelectTrigger className="mt-1"><SelectValue placeholder={t('accountWizard.noneOption')} /></SelectTrigger>
+              <SelectTrigger className="mt-1.5 h-11 w-full"><SelectValue placeholder={t('accountWizard.noneOption')} /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">{t('accountWizard.noneOption')}</SelectItem>
                 {parentOptions.map((a) => (
@@ -176,7 +177,7 @@ export function AccountWizardDialog({
           </div>
         </div>
 
-        <Button className="w-full" disabled={submitting || !canSubmit} onClick={onSubmit}>
+        <Button className="w-full h-11" disabled={submitting || !canSubmit} onClick={onSubmit}>
           {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {mode === 'create' ? t('accountWizard.submitCreate') : t('accountWizard.submitEdit')}
         </Button>

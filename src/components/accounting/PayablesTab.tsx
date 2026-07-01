@@ -13,6 +13,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ReportTableShell, reportTableHead, reportTableHeadRight } from '@/components/reports/ReportLayout';
 import { toast } from 'sonner';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { useStorePaymentMethods } from '@/lib/hooks/useStorePaymentMethods';
 
 interface SupplierRow {
   id: string;
@@ -28,6 +29,14 @@ export function PayablesTab() {
   const [paySupplier, setPaySupplier] = useState<SupplierRow | null>(null);
   const [amount, setAmount] = useState('');
   const [method, setMethod] = useState('cash');
+  const { data: storePaymentMethods = [] } = useStorePaymentMethods();
+  const methodOptions = storePaymentMethods.length > 0
+    ? storePaymentMethods.filter((m) => m.slug !== 'customer_deposit' && m.is_active)
+    : [
+        { slug: 'cash', label: 'Cash' },
+        { slug: 'bank', label: 'Bank Transfer' },
+        { slug: 'evc',  label: 'EVC Plus' },
+      ];
 
   const currency = currentStore?.currency || 'USD';
   const fmt = (n: number) =>
@@ -119,23 +128,45 @@ export function PayablesTab() {
       </ReportTableShell>
 
       <Dialog open={!!paySupplier} onOpenChange={() => setPaySupplier(null)}>
-        <DialogContent className="sm:max-w-sm">
+        <DialogContent className="sm:max-w-sm rounded-2xl">
           <DialogHeader><DialogTitle>{t('payables.dialogTitle')}</DialogTitle></DialogHeader>
-          <p className="text-sm text-slate-500">{t('payables.dialogBalance', { name: paySupplier?.name ?? '', balance: fmt(paySupplier?.balance ?? 0) })}</p>
-          <div className="space-y-3">
-            <div><Label>{t('payables.labelAmount')}</Label><Input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} /></div>
-            <div>
-              <Label>{t('payables.labelMethod')}</Label>
+          <div className="rounded-xl bg-slate-50 border border-slate-200 px-4 py-3">
+            <p className="text-sm font-semibold text-slate-800">{paySupplier?.name}</p>
+            <p className="text-xs text-slate-500 mt-0.5">
+              {t('payables.colBalance')}: <strong className="text-red-700">{fmt(paySupplier?.balance ?? 0)}</strong>
+            </p>
+          </div>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-slate-700">{t('payables.labelAmount')}</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                className="h-12 text-lg font-semibold tabular-nums"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-slate-700">{t('payables.labelMethod')}</Label>
               <Select value={method} onValueChange={(v) => setMethod(v ?? 'cash')}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectTrigger className="h-11 w-full"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {['cash', 'waafi', 'evc', 'sahal', 'zaad'].map((m) => (
-                    <SelectItem key={m} value={m} className="capitalize">{m}</SelectItem>
+                  {methodOptions.map((m) => (
+                    <SelectItem key={m.slug} value={m.slug}>{m.label}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            <Button className="w-full" disabled={isPending} onClick={() => recordPayment()}>{t('payables.postPayment')}</Button>
+            <Button
+              className="w-full h-11"
+              disabled={isPending || !amount || parseFloat(amount) <= 0}
+              onClick={() => recordPayment()}
+            >
+              {t('payables.postPayment')}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

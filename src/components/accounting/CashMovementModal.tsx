@@ -17,6 +17,7 @@ import {
 import { toast } from 'sonner';
 import { Loader2, ArrowDownToLine, ArrowUpFromLine } from 'lucide-react';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { useStorePaymentMethods } from '@/lib/hooks/useStorePaymentMethods';
 
 type MovementType = 'deposit' | 'withdrawal';
 
@@ -35,10 +36,13 @@ export function CashMovementModal({ open, defaultType = 'deposit', onClose }: Ca
   const [method, setMethod] = useState('cash');
   const [reference, setReference] = useState('');
   const [notes, setNotes] = useState('');
-
-  useEffect(() => {
-    if (open) setMovementType(defaultType);
-  }, [open, defaultType]);
+  const { data: storePaymentMethods = [] } = useStorePaymentMethods();
+  const methodOptions = storePaymentMethods.length > 0
+    ? storePaymentMethods.filter((m) => m.slug !== 'customer_deposit' && m.is_active)
+    : [
+        { slug: 'cash', label: 'Cash' },
+        { slug: 'bank', label: 'Bank Transfer' },
+      ];
 
   useEffect(() => {
     if (open) setMovementType(defaultType);
@@ -98,18 +102,16 @@ export function CashMovementModal({ open, defaultType = 'deposit', onClose }: Ca
           <div className="flex gap-2">
             <Button
               type="button"
-              size="sm"
               variant={movementType === 'deposit' ? 'default' : 'outline'}
-              className="flex-1"
+              className="flex-1 h-11"
               onClick={() => setMovementType('deposit')}
             >
               {t('cashMovement.btnDeposit')}
             </Button>
             <Button
               type="button"
-              size="sm"
               variant={movementType === 'withdrawal' ? 'default' : 'outline'}
-              className="flex-1"
+              className="flex-1 h-11"
               onClick={() => setMovementType('withdrawal')}
             >
               {t('cashMovement.btnWithdrawal')}
@@ -117,37 +119,46 @@ export function CashMovementModal({ open, defaultType = 'deposit', onClose }: Ca
           </div>
 
           <div className="space-y-1.5">
-            <Label>{t('cashMovement.labelAmount', { currency: currentStore?.currency ?? 'USD' })}</Label>
-            <Input type="number" min={0} step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} />
+            <Label className="text-sm font-medium text-slate-700">{t('cashMovement.labelAmount', { currency: currentStore?.currency ?? 'USD' })}</Label>
+            <Input
+              type="number"
+              min={0}
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="h-12 text-lg font-semibold tabular-nums"
+              autoFocus
+            />
           </div>
 
           <div className="space-y-1.5">
-            <Label>{t('cashMovement.labelAccount')}</Label>
+            <Label className="text-sm font-medium text-slate-700">{t('cashMovement.labelAccount')}</Label>
             <Select value={method} onValueChange={(v) => v && setMethod(v)}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectTrigger className="h-11 w-full"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="cash">{t('cashMovement.optCash')}</SelectItem>
-                <SelectItem value="bank">{t('cashMovement.optBank')}</SelectItem>
+                {methodOptions.map((m) => (
+                  <SelectItem key={m.slug} value={m.slug}>{m.label}</SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
 
           <div className="space-y-1.5">
-            <Label>{t('cashMovement.labelReference')}</Label>
-            <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder={t('cashMovement.referencePlaceholder')} />
+            <Label className="text-sm font-medium text-slate-700">{t('cashMovement.labelReference')}</Label>
+            <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder={t('cashMovement.referencePlaceholder')} className="h-11" />
           </div>
 
           <div className="space-y-1.5">
-            <Label>{t('cashMovement.labelNotes')}</Label>
-            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="resize-none" />
+            <Label className="text-sm font-medium text-slate-700">{t('cashMovement.labelNotes')}</Label>
+            <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} rows={2} className="resize-none min-h-[64px]" />
           </div>
         </div>
 
         <DialogFooter className="gap-2">
-          <Button variant="outline" onClick={handleClose}>{t('cashMovement.cancel')}</Button>
+          <Button variant="outline" className="h-11" onClick={handleClose}>{t('cashMovement.cancel')}</Button>
           <Button
-            className={movementType === 'deposit' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-orange-600 hover:bg-orange-700'}
-            disabled={isPending}
+            className={`h-11 ${movementType === 'deposit' ? 'bg-emerald-600 hover:bg-emerald-700' : 'bg-orange-600 hover:bg-orange-700'}`}
+            disabled={isPending || !amount || parseFloat(amount) <= 0}
             onClick={() => mutate()}
           >
             {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : t('cashMovement.save')}

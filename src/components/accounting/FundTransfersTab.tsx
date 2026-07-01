@@ -141,13 +141,13 @@ export function FundTransfersTab() {
       <div className="flex items-center gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           <Label className="text-xs text-slate-500 whitespace-nowrap">From:</Label>
-          <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-8 w-36 text-xs" />
+          <Input type="date" value={fromDate} onChange={(e) => setFromDate(e.target.value)} className="h-9 w-36 text-xs" />
         </div>
         <div className="flex items-center gap-2">
           <Label className="text-xs text-slate-500 whitespace-nowrap">To:</Label>
-          <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-8 w-36 text-xs" />
+          <Input type="date" value={toDate} onChange={(e) => setToDate(e.target.value)} className="h-9 w-36 text-xs" />
         </div>
-        <Button size="sm" variant="outline" className="h-8 text-xs" onClick={() => { setFromDate(''); setToDate(''); }}>
+        <Button size="sm" variant="outline" className="h-9 text-xs" onClick={() => { setFromDate(''); setToDate(''); }}>
           Clear
         </Button>
       </div>

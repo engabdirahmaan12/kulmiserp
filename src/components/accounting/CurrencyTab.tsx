@@ -94,15 +94,15 @@ export function CurrencyTab() {
       </div>
 
       <div className="rounded-xl border border-slate-200 dark:border-slate-800 p-4 space-y-3 max-w-md">
-        <Label>{t('currency.labelSecondary')}</Label>
+        <Label className="text-sm font-medium text-slate-700">{t('currency.labelSecondary')}</Label>
         <div className="flex gap-2">
           <Input
             placeholder="e.g. SOS, EUR"
             value={secondaryCurrency}
             onChange={(e) => setSecondaryCurrency(e.target.value.toUpperCase())}
-            className="uppercase"
+            className="uppercase h-11"
           />
-          <Button onClick={() => saveSettings()} disabled={savingSettings} variant="outline">
+          <Button onClick={() => saveSettings()} disabled={savingSettings} variant="outline" className="h-11">
             {t('currency.saveButton')}
           </Button>
         </div>
@@ -115,21 +115,21 @@ export function CurrencyTab() {
         <div className="grid grid-cols-3 gap-3">
           <div>
             <Label className="text-xs">{t('currency.labelFrom')}</Label>
-            <Input placeholder={baseCurrency} value={fromCurrency} onChange={(e) => setFromCurrency(e.target.value.toUpperCase())} />
+            <Input placeholder={baseCurrency} value={fromCurrency} onChange={(e) => setFromCurrency(e.target.value.toUpperCase())} className="h-11" />
           </div>
           <div>
             <Label className="text-xs">{t('currency.labelTo')}</Label>
-            <Input placeholder="SOS" value={toCurrency} onChange={(e) => setToCurrency(e.target.value.toUpperCase())} />
+            <Input placeholder="SOS" value={toCurrency} onChange={(e) => setToCurrency(e.target.value.toUpperCase())} className="h-11" />
           </div>
           <div>
             <Label className="text-xs">{t('currency.labelRate')}</Label>
-            <Input type="number" step="0.000001" placeholder="1.0" value={rate} onChange={(e) => setRate(e.target.value)} />
+            <Input type="number" step="0.000001" placeholder="1.0" value={rate} onChange={(e) => setRate(e.target.value)} className="h-11" />
           </div>
         </div>
         <Button
           onClick={() => saveRate()}
           disabled={isPending || !toCurrency || !rate}
-          className="bg-gradient-to-r from-blue-600 to-indigo-600"
+          className="h-11 bg-gradient-to-r from-blue-600 to-indigo-600"
         >
           {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           {t('currency.addRateButton')}

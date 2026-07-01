@@ -115,7 +115,7 @@ export function AccountingSettingsTab() {
         <div className="grid sm:grid-cols-2 gap-4">
           <div>
             <Label className="text-xs text-slate-500">{t('acctSettings.labelDefaultCurrency')}</Label>
-            <Input value={baseCurrency} disabled className="mt-1 bg-slate-50" />
+            <Input value={baseCurrency} disabled className="mt-1.5 h-11 bg-slate-50" />
             <p className="text-[10px] text-slate-400 mt-1">{t('acctSettings.defaultCurrencyNote')}</p>
           </div>
           <div>
@@ -124,7 +124,7 @@ export function AccountingSettingsTab() {
               value={secondaryCurrency}
               onChange={(e) => setSecondaryCurrency(e.target.value.toUpperCase())}
               placeholder="SOS"
-              className="mt-1 uppercase"
+              className="mt-1.5 h-11 uppercase"
             />
           </div>
         </div>
@@ -139,7 +139,7 @@ export function AccountingSettingsTab() {
         <div>
           <Label className="text-xs text-slate-500">{t('acctSettings.labelFiscalStart')}</Label>
           <Select value={fiscalMonth} onValueChange={(val) => { if (val) setFiscalMonth(val); }}>
-            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="mt-1.5 h-11 w-full"><SelectValue /></SelectTrigger>
             <SelectContent>
               {FISCAL_MONTHS.map((m) => (
                 <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
@@ -154,7 +154,7 @@ export function AccountingSettingsTab() {
         <div>
           <Label className="text-xs text-slate-500">{t('acctSettings.labelCostMethod')}</Label>
           <Select value={costMethod} onValueChange={(v) => setCostMethod(v as CostMethod)}>
-            <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+            <SelectTrigger className="mt-1.5 h-11 w-full"><SelectValue /></SelectTrigger>
             <SelectContent>
               {COST_METHOD_KEYS.map((key) => (
                 <SelectItem key={key} value={key}>
@@ -179,7 +179,7 @@ export function AccountingSettingsTab() {
               value={defaultCashId || 'none'}
               onValueChange={(v) => setDefaultCashId(v === 'none' ? '' : v ?? '')}
             >
-              <SelectTrigger className="mt-1 w-full"><SelectValue placeholder={t('acctSettings.defaultCash')} /></SelectTrigger>
+              <SelectTrigger className="mt-1.5 h-11 w-full"><SelectValue placeholder={t('acctSettings.defaultCash')} /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">{t('acctSettings.defaultCash')}</SelectItem>
                 {cashOptions.map((a) => (
@@ -195,7 +195,7 @@ export function AccountingSettingsTab() {
               value={defaultRevenueId || 'none'}
               onValueChange={(v) => setDefaultRevenueId(v === 'none' ? '' : v ?? '')}
             >
-              <SelectTrigger className="mt-1 w-full"><SelectValue placeholder={t('acctSettings.defaultRevenue')} /></SelectTrigger>
+              <SelectTrigger className="mt-1.5 h-11 w-full"><SelectValue placeholder={t('acctSettings.defaultRevenue')} /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">{t('acctSettings.defaultRevenue')}</SelectItem>
                 {revenueOptions.map((a) => (
@@ -211,7 +211,7 @@ export function AccountingSettingsTab() {
               value={defaultExpenseId || 'none'}
               onValueChange={(v) => setDefaultExpenseId(v === 'none' ? '' : v ?? '')}
             >
-              <SelectTrigger className="mt-1 w-full"><SelectValue placeholder={t('acctSettings.defaultExpense')} /></SelectTrigger>
+              <SelectTrigger className="mt-1.5 h-11 w-full"><SelectValue placeholder={t('acctSettings.defaultExpense')} /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">{t('acctSettings.defaultExpense')}</SelectItem>
                 {expenseOptions.map((a) => (
@@ -231,7 +231,7 @@ export function AccountingSettingsTab() {
             value={coaPrefix}
             onChange={(e) => setCoaPrefix(e.target.value)}
             placeholder={t('acctSettings.coaPrefixPlaceholder')}
-            className="mt-1"
+            className="mt-1.5 h-11"
           />
           <p className="text-[10px] text-slate-400 mt-1">{t('acctSettings.coaPrefixNote')}</p>
         </div>
@@ -246,7 +246,7 @@ export function AccountingSettingsTab() {
         </div>
       </div>
 
-      <Button onClick={() => save()} disabled={isPending} className="gap-2">
+      <Button onClick={() => save()} disabled={isPending} className="h-11 gap-2">
         {isPending && <Loader2 className="h-4 w-4 animate-spin" />}
         {t('acctSettings.saveButton')}
       </Button>

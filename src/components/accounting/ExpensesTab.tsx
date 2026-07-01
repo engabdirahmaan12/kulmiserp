@@ -24,6 +24,7 @@ import { format } from 'date-fns';
 import type { Expense } from '@/types';
 import { useClosedPeriods } from '@/lib/accounting/hooks';
 import { useTranslation } from '@/lib/i18n/useTranslation';
+import { useStorePaymentMethods } from '@/lib/hooks/useStorePaymentMethods';
 
 const expenseSchema = z.object({
   description: z.string().min(1, 'Description is required'),
@@ -69,6 +70,14 @@ export function ExpensesTab({ highlightExpenseId = null, linkMode = 'standalone'
   const queryClient = useQueryClient();
   const canApprove = storeUser?.role === 'owner' || storeUser?.role === 'accountant';
   const { isDateClosed } = useClosedPeriods();
+  const { data: storePaymentMethods = [] } = useStorePaymentMethods();
+  const methodOptions = storePaymentMethods.length > 0
+    ? storePaymentMethods.filter((m) => m.slug !== 'customer_deposit' && m.is_active)
+    : [
+        { slug: 'cash', label: 'Cash' },
+        { slug: 'bank', label: 'Bank Transfer' },
+        { slug: 'evc',  label: 'EVC Plus' },
+      ];
 
   const { data: expenses = [], isLoading } = useQuery({
     queryKey: ['expenses', currentStore?.id],
@@ -341,19 +350,25 @@ export function ExpensesTab({ highlightExpenseId = null, linkMode = 'standalone'
 
           <form onSubmit={handleSubmit((d) => mutate(d))} className="space-y-4">
             <div className="space-y-1.5">
-              <Label>{t('expenses.descriptionLabel')}</Label>
-              <Input {...register('description')} placeholder={t('expenses.descriptionPlaceholder')} />
+              <Label className="text-sm font-medium text-slate-700">{t('expenses.descriptionLabel')}</Label>
+              <Input {...register('description')} placeholder={t('expenses.descriptionPlaceholder')} className="h-11" />
               {errors.description && <p className="text-xs text-red-500">{errors.description.message}</p>}
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>{t('expenses.amountLabel')}</Label>
-                <Input type="number" step="0.01" {...register('amount', { valueAsNumber: true })} placeholder="0.00" />
+                <Label className="text-sm font-medium text-slate-700">{t('expenses.amountLabel')}</Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  {...register('amount', { valueAsNumber: true })}
+                  placeholder="0.00"
+                  className="h-12 text-lg font-semibold tabular-nums"
+                />
                 {errors.amount && <p className="text-xs text-red-500">{errors.amount.message}</p>}
               </div>
               <div className="space-y-1.5">
-                <Label>{t('expenses.dateLabel')}</Label>
+                <Label className="text-sm font-medium text-slate-700">{t('expenses.dateLabel')}</Label>
                 <Input
                   type="date"
                   {...register('expense_date')}
@@ -361,6 +376,7 @@ export function ExpensesTab({ highlightExpenseId = null, linkMode = 'standalone'
                     setExpenseDate(e.target.value);
                     register('expense_date').onChange(e);
                   }}
+                  className="h-11"
                 />
                 {isDateClosed(expenseDate) && (
                   <div className="flex items-start gap-1.5 rounded-lg bg-red-50 border border-red-200 px-2 py-1.5 mt-1">
@@ -373,21 +389,21 @@ export function ExpensesTab({ highlightExpenseId = null, linkMode = 'standalone'
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
-                <Label>{t('expenses.categoryLabel')}</Label>
+                <Label className="text-sm font-medium text-slate-700">{t('expenses.categoryLabel')}</Label>
                 <Select onValueChange={(v: string | null) => setValue('category', v ?? undefined)}>
-                  <SelectTrigger><SelectValue placeholder={t('expenses.categoryPlaceholder')} /></SelectTrigger>
+                  <SelectTrigger className="h-11 w-full"><SelectValue placeholder={t('expenses.categoryPlaceholder')} /></SelectTrigger>
                   <SelectContent>
                     {EXPENSE_CATEGORIES.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                   </SelectContent>
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>{t('expenses.paymentMethodLabel')}</Label>
+                <Label className="text-sm font-medium text-slate-700">{t('expenses.paymentMethodLabel')}</Label>
                 <Select defaultValue="cash" onValueChange={(v: string | null) => setValue('payment_method', v ?? 'cash')}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="h-11 w-full"><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {['cash', 'waafi', 'evc', 'sahal', 'zaad', 'salaam', 'premier', 'dahabshiil'].map((m) => (
-                      <SelectItem key={m} value={m} className="capitalize">{m}</SelectItem>
+                    {methodOptions.map((m) => (
+                      <SelectItem key={m.slug} value={m.slug}>{m.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -395,17 +411,17 @@ export function ExpensesTab({ highlightExpenseId = null, linkMode = 'standalone'
             </div>
 
             <div className="space-y-1.5">
-              <Label>{t('expenses.receiptLabel')}</Label>
+              <Label className="text-sm font-medium text-slate-700">{t('expenses.receiptLabel')}</Label>
               <input ref={fileRef} type="file" accept="image/*,.pdf" className="hidden" onChange={(e) => setReceiptFile(e.target.files?.[0] || null)} />
-              <Button type="button" variant="outline" className="w-full gap-2" onClick={() => fileRef.current?.click()}>
+              <Button type="button" variant="outline" className="w-full h-11 gap-2" onClick={() => fileRef.current?.click()}>
                 <Upload className="h-4 w-4" />
                 {receiptFile ? receiptFile.name : t('expenses.uploadReceipt')}
               </Button>
             </div>
 
             <div className="space-y-1.5">
-              <Label>{t('expenses.referenceLabel')}</Label>
-              <Input {...register('reference')} placeholder={t('expenses.referencePlaceholder')} />
+              <Label className="text-sm font-medium text-slate-700">{t('expenses.referenceLabel')}</Label>
+              <Input {...register('reference')} placeholder={t('expenses.referencePlaceholder')} className="h-11" />
             </div>
 
             {!canApprove && (
@@ -415,8 +431,8 @@ export function ExpensesTab({ highlightExpenseId = null, linkMode = 'standalone'
             )}
 
             <div className="flex gap-3">
-              <Button type="button" variant="outline" className="flex-1" onClick={() => setShowForm(false)}>{t('expenses.cancelButton')}</Button>
-              <Button type="submit" className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600" disabled={isPending || !!isDateClosed(expenseDate)}>
+              <Button type="button" variant="outline" className="flex-1 h-11" onClick={() => setShowForm(false)}>{t('expenses.cancelButton')}</Button>
+              <Button type="submit" className="flex-1 h-11 bg-gradient-to-r from-blue-600 to-indigo-600" disabled={isPending || !!isDateClosed(expenseDate)}>
                 {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 {canApprove ? t('expenses.savePost') : t('expenses.submitApproval')}
               </Button>

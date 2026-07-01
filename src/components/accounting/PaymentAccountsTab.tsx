@@ -48,10 +48,19 @@ export function PaymentAccountsTab() {
   // ── Add dialog state ───────────────────────────────────────────────────────
   const [showAdd,        setShowAdd]        = useState(false);
   const [slug,           setSlug]           = useState('');
+  const [slugEdited,     setSlugEdited]     = useState(false);
   const [label,          setLabel]          = useState('');
   const [createAccount,  setCreateAccount]  = useState(autoCreateDefault);
   const [linkAccountId,  setLinkAccountId]  = useState('');
   const [showInactive,   setShowInactive]   = useState(false);
+
+  // Short code is derived from the display name so non-technical owners never
+  // have to think about it — it stays editable for the rare case they want to.
+  const slugify = (s: string) => s.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const handleLabelChange = (v: string) => {
+    setLabel(v);
+    if (!slugEdited) setSlug(slugify(v));
+  };
 
   // ── Edit dialog state ──────────────────────────────────────────────────────
   const [editState, setEditState] = useState<EditState | null>(null);
@@ -92,7 +101,7 @@ export function PaymentAccountsTab() {
     new Intl.NumberFormat('en-US', { style: 'currency', currency, minimumFractionDigits: 2 }).format(n);
 
   // ── Add method ─────────────────────────────────────────────────────────────
-  const resetAddForm = () => { setSlug(''); setLabel(''); setCreateAccount(autoCreateDefault); setLinkAccountId(''); };
+  const resetAddForm = () => { setSlug(''); setSlugEdited(false); setLabel(''); setCreateAccount(autoCreateDefault); setLinkAccountId(''); };
   const openAdd = () => { resetAddForm(); setShowAdd(true); };
 
   const { mutate: createMethod, isPending: creating } = useMutation({
@@ -353,34 +362,42 @@ export function PaymentAccountsTab() {
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>{t('paymentAccounts.labelSlug')}</Label>
-              <Input
-                placeholder={t('paymentAccounts.slugPlaceholder')}
-                value={slug}
-                onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/\s+/g, '_'))}
-                className="mt-1"
-              />
-              <p className="text-[10px] text-slate-400 mt-1">{t('paymentAccounts.slugNote')}</p>
-            </div>
-            <div>
-              <Label>{t('paymentAccounts.labelDisplayName')}</Label>
+              <Label className="text-sm font-medium text-slate-700">{t('paymentAccounts.labelDisplayName')}</Label>
               <Input
                 placeholder={t('paymentAccounts.displayNamePlaceholder')}
                 value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                className="mt-1"
+                onChange={(e) => handleLabelChange(e.target.value)}
+                className="mt-1.5 h-11"
+                autoFocus
               />
-              <p className="text-[10px] text-slate-400 mt-1">{t('paymentAccounts.displayNameNote')}</p>
+              <p className="text-xs text-slate-400 mt-1">{t('paymentAccounts.displayNameNote')}</p>
             </div>
-            <div className="rounded-lg border border-slate-200 p-3 space-y-3 dark:border-slate-700">
+            {slug && (
+              <details className="group">
+                <summary className="text-xs text-slate-400 hover:text-slate-600 cursor-pointer select-none list-none flex items-center gap-1">
+                  <span className="group-open:rotate-90 transition-transform">▸</span> {t('paymentAccounts.labelSlug')}: <code className="bg-slate-100 rounded px-1">{slug}</code>
+                </summary>
+                <div className="mt-2">
+                  <Input
+                    placeholder={t('paymentAccounts.slugPlaceholder')}
+                    value={slug}
+                    onChange={(e) => { setSlugEdited(true); setSlug(e.target.value.toLowerCase().replace(/\s+/g, '_')); }}
+                    className="h-11"
+                  />
+                  <p className="text-xs text-slate-400 mt-1">{t('paymentAccounts.slugNote')}</p>
+                </div>
+              </details>
+            )}
+            <div className="rounded-xl border border-slate-200 p-3.5 space-y-3 dark:border-slate-700">
               <div className="flex items-start gap-3">
                 <Checkbox
                   id="create-acct"
                   checked={createAccount}
                   onCheckedChange={(v) => setCreateAccount(v === true)}
+                  className="mt-0.5"
                 />
                 <div>
-                  <Label htmlFor="create-acct" className="cursor-pointer font-medium">
+                  <Label htmlFor="create-acct" className="cursor-pointer font-medium text-sm">
                     {t('paymentAccounts.createAccountLabel')}
                   </Label>
                   <p className="text-xs text-slate-500 mt-0.5">{t('paymentAccounts.createAccountNote')}</p>
@@ -388,13 +405,13 @@ export function PaymentAccountsTab() {
               </div>
               {!createAccount && (
                 <div>
-                  <Label>{t('paymentAccounts.labelLinkAccount')}</Label>
+                  <Label className="text-sm font-medium text-slate-700">{t('paymentAccounts.labelLinkAccount')}</Label>
                   <Select
                     items={assetSelectItems}
                     value={linkAccountId || 'none'}
                     onValueChange={(v) => setLinkAccountId(v === 'none' ? '' : v ?? '')}
                   >
-                    <SelectTrigger className="mt-1 w-full">
+                    <SelectTrigger className="mt-1.5 h-11 w-full">
                       <SelectValue placeholder={t('paymentAccounts.selectAccount')} />
                     </SelectTrigger>
                     <SelectContent>
@@ -409,7 +426,7 @@ export function PaymentAccountsTab() {
                 </div>
               )}
             </div>
-            <Button className="w-full" disabled={creating || !canSubmitAdd} onClick={() => createMethod()}>
+            <Button className="w-full h-11" disabled={creating || !canSubmitAdd} onClick={() => createMethod()}>
               {creating && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               {createAccount ? t('paymentAccounts.submitWithAccount') : t('paymentAccounts.submitNoAccount')}
             </Button>
@@ -436,42 +453,42 @@ export function PaymentAccountsTab() {
               </div>
 
               <div>
-                <Label>Display Name <span className="text-red-500">*</span></Label>
+                <Label className="text-sm font-medium text-slate-700">Display Name <span className="text-red-500">*</span></Label>
                 <Input
                   value={editState.label}
                   onChange={(e) => setEditState((s) => s ? { ...s, label: e.target.value } : s)}
-                  className="mt-1"
+                  className="mt-1.5 h-11"
                   placeholder="e.g. EVC Plus, Bank Transfer…"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <Label>Account Number</Label>
+                  <Label className="text-sm font-medium text-slate-700">Account Number</Label>
                   <Input
                     value={editState.account_number}
                     onChange={(e) => setEditState((s) => s ? { ...s, account_number: e.target.value } : s)}
-                    className="mt-1"
+                    className="mt-1.5 h-11"
                     placeholder="e.g. 0615001234"
                   />
                 </div>
                 <div>
-                  <Label>Account Holder Name</Label>
+                  <Label className="text-sm font-medium text-slate-700">Account Holder Name</Label>
                   <Input
                     value={editState.account_name}
                     onChange={(e) => setEditState((s) => s ? { ...s, account_name: e.target.value } : s)}
-                    className="mt-1"
+                    className="mt-1.5 h-11"
                     placeholder="e.g. Ali Ahmed"
                   />
                 </div>
               </div>
 
               <div>
-                <Label>Description (optional)</Label>
+                <Label className="text-sm font-medium text-slate-700">Description (optional)</Label>
                 <Textarea
                   value={editState.description}
                   onChange={(e) => setEditState((s) => s ? { ...s, description: e.target.value } : s)}
-                  className="mt-1 resize-none min-h-[72px]"
+                  className="mt-1.5 resize-none min-h-[72px]"
                   placeholder="Any notes about this payment method…"
                 />
               </div>
@@ -489,11 +506,11 @@ export function PaymentAccountsTab() {
               </div>
 
               <div className="flex gap-3">
-                <Button variant="outline" className="flex-1" onClick={() => setEditState(null)} disabled={saving}>
+                <Button variant="outline" className="flex-1 h-11" onClick={() => setEditState(null)} disabled={saving}>
                   Cancel
                 </Button>
                 <Button
-                  className="flex-1"
+                  className="flex-1 h-11"
                   disabled={saving || !editState.label.trim()}
                   onClick={() => saveEdit()}
                 >

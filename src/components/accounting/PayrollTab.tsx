@@ -214,12 +214,18 @@ export function PayrollTab() {
       </div>
 
       <Dialog open={showEmployee} onOpenChange={setShowEmployee}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-sm rounded-2xl">
           <DialogHeader><DialogTitle>{t('payroll.addEmployeeTitle')}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div><Label>{t('payroll.labelName')}</Label><Input value={empName} onChange={(e) => setEmpName(e.target.value)} /></div>
-            <div><Label>{t('payroll.labelBaseSalary')}</Label><Input type="number" value={empSalary} onChange={(e) => setEmpSalary(e.target.value)} /></div>
-            <Button onClick={() => addEmployee()} disabled={addingEmp || !empName}>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-slate-700">{t('payroll.labelName')}</Label>
+              <Input value={empName} onChange={(e) => setEmpName(e.target.value)} className="h-11" autoFocus />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-slate-700">{t('payroll.labelBaseSalary')}</Label>
+              <Input type="number" value={empSalary} onChange={(e) => setEmpSalary(e.target.value)} className="h-12 text-lg font-semibold tabular-nums" />
+            </div>
+            <Button className="w-full h-11" onClick={() => addEmployee()} disabled={addingEmp || !empName}>
               {addingEmp && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {t('payroll.saveButton')}
             </Button>
           </div>
@@ -227,13 +233,19 @@ export function PayrollTab() {
       </Dialog>
 
       <Dialog open={showRun} onOpenChange={setShowRun}>
-        <DialogContent>
+        <DialogContent className="sm:max-w-sm rounded-2xl">
           <DialogHeader><DialogTitle>{t('payroll.createRunTitle')}</DialogTitle></DialogHeader>
-          <div className="space-y-3">
-            <div><Label>{t('payroll.labelPeriodStart')}</Label><Input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} /></div>
-            <div><Label>{t('payroll.labelPeriodEnd')}</Label><Input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} /></div>
-            <p className="text-xs text-slate-500">{t('payroll.runSummary', { count: String(employees.length), total: fmt(employees.reduce((s, e) => s + e.base_salary, 0)) })}</p>
-            <Button onClick={() => createRun()} disabled={creatingRun || !periodStart || !periodEnd}>
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-slate-700">{t('payroll.labelPeriodStart')}</Label>
+              <Input type="date" value={periodStart} onChange={(e) => setPeriodStart(e.target.value)} className="h-11" />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-slate-700">{t('payroll.labelPeriodEnd')}</Label>
+              <Input type="date" value={periodEnd} onChange={(e) => setPeriodEnd(e.target.value)} className="h-11" />
+            </div>
+            <p className="text-xs text-slate-500 bg-slate-50 rounded-lg px-3 py-2">{t('payroll.runSummary', { count: String(employees.length), total: fmt(employees.reduce((s, e) => s + e.base_salary, 0)) })}</p>
+            <Button className="w-full h-11" onClick={() => createRun()} disabled={creatingRun || !periodStart || !periodEnd}>
               {creatingRun && <Loader2 className="mr-2 h-4 w-4 animate-spin" />} {t('payroll.createDraft')}
             </Button>
           </div>
