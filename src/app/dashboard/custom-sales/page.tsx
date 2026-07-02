@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo, useCallback, useRef, useEffect } from 'react';
+import { useState, useMemo, useCallback, useRef, useEffect, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
@@ -42,6 +42,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   dbSaleItemToSaleLine,
   defaultSalePriceForProduct,
+  getEffectivePriceTier,
   lineBaseQty,
   pickDefaultSaleUnit,
   repriceSaleLineUnit,
@@ -49,6 +50,9 @@ import {
   saleLineToRpcPayload,
   type SaleLineCore,
 } from '@/lib/units/engine';
+import type { PriceTier } from '@/lib/units/conversion';
+import { getPosAllowPriceOverride } from '@/lib/pos/pricing';
+import { usePermission } from '@/lib/hooks/usePermission';
 import { InvoiceLineUnitSelect } from '@/components/sales/InvoiceLineUnitSelect';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -66,6 +70,10 @@ interface LineItem {
   conversion_factor?: number;
   base_qty?: number;
   cost_price?: number;
+  price_tier?: PriceTier;
+  /** Set when a manual price override was applied — audit trail. */
+  original_unit_price?: number | null;
+  price_override_reason?: string | null;
 }
 
 function newLineItem(): LineItem {
@@ -81,7 +89,7 @@ function newLineItem(): LineItem {
   };
 }
 
-function lineItemToSaleCore(item: LineItem): SaleLineCore {
+function lineItemToSaleCore(item: LineItem, overriddenByUserId: string | null = null): SaleLineCore {
   const conv = item.conversion_factor ?? 1;
   const saleQty = item.quantity;
   const { discountAmt, taxAmt } = computeItemTotals(item);
@@ -100,7 +108,10 @@ function lineItemToSaleCore(item: LineItem): SaleLineCore {
     discount_amount: discountAmt,
     tax_amount: taxAmt,
     subtotal: lineNet + taxAmt,
-    price_tier: 'retail',
+    price_tier: item.price_tier ?? 'retail',
+    original_unit_price: item.original_unit_price ?? null,
+    price_override_reason: item.price_override_reason ?? null,
+    price_overridden_by: item.price_override_reason ? overriddenByUserId : null,
   };
 }
 
@@ -220,7 +231,7 @@ async function saveSale(payload: SaveSalePayload) {
   if (status === 'completed') {
     const lineItems = items
       .filter((it) => it.description.trim())
-      .map((it) => saleLineToRpcPayload(lineItemToSaleCore(it)));
+      .map((it) => saleLineToRpcPayload(lineItemToSaleCore(it, userId)));
 
     const creditAmount = paidAmount < total ? total - paidAmount : 0;
     const { data, error } = await supabase.rpc('complete_custom_sale', {
@@ -272,7 +283,7 @@ async function saveSale(payload: SaveSalePayload) {
 
   const saleItems = items
     .filter((it) => it.description.trim())
-    .map((it) => saleLineToDraftRow(storeId, sale.id, lineItemToSaleCore(it)));
+    .map((it) => saleLineToDraftRow(storeId, sale.id, lineItemToSaleCore(it, userId)));
 
   if (saleItems.length > 0) {
     const { error: itemsErr } = await supabase.from('sale_items').insert(saleItems);
@@ -320,11 +331,13 @@ interface ProductSearchCellProps {
   item: LineItem;
   products: ProductRow[];
   storeDefaultTax: number;
+  customer: Customer | null;
+  storeSettings: Record<string, unknown>;
   onChange: (id: string, patch: Partial<LineItem>) => void;
   onOpenQuickAdd: () => void;
 }
 
-function ProductSearchCell({ item, products, storeDefaultTax, onChange, onOpenQuickAdd }: ProductSearchCellProps) {
+function ProductSearchCell({ item, products, storeDefaultTax, customer, storeSettings, onChange, onOpenQuickAdd }: ProductSearchCellProps) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
@@ -345,8 +358,9 @@ function ProductSearchCell({ item, products, storeDefaultTax, onChange, onOpenQu
   }, [products, search]);
 
   const selectProduct = (p: ProductRow) => {
+    const tier = getEffectivePriceTier(p, customer, storeSettings);
     const defaultUnit = pickDefaultSaleUnit(p);
-    let unitPrice = defaultSalePriceForProduct(p, 'retail');
+    let unitPrice = defaultSalePriceForProduct(p, tier);
     let discountPct = 0;
     if (p.active_discount) {
       if (p.active_discount.discount_type === 'percentage') {
@@ -369,6 +383,7 @@ function ProductSearchCell({ item, products, storeDefaultTax, onChange, onOpenQu
       conversion_factor: conv,
       base_qty: lineBaseQty(1, conv),
       quantity: 1,
+      price_tier: tier,
     });
     setSearch('');
     setOpen(false);
@@ -439,7 +454,7 @@ function ProductSearchCell({ item, products, storeDefaultTax, onChange, onOpenQu
                         </>
                       ) : (
                         <span className="text-xs font-semibold text-teal-600">
-                          {fmtCurrency(defaultSalePriceForProduct(p, 'retail'))}
+                          {fmtCurrency(defaultSalePriceForProduct(p, getEffectivePriceTier(p, customer, storeSettings)))}
                         </span>
                       )}
                     </div>
@@ -588,7 +603,11 @@ function QuickAddProductModal({ open, onClose, storeId, onCreated, categories }:
 export default function CustomSalesPage() {
   const router = useRouter();
   const { currentStore, user } = useAuthStore();
+  const { role } = usePermission();
   const { t } = useTranslation();
+  const canOverridePrice =
+    getPosAllowPriceOverride((currentStore?.settings ?? {}) as Record<string, unknown>) &&
+    (role === 'owner' || role === 'manager');
   const currency = currentStore?.currency || 'USD';
 
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
@@ -742,15 +761,16 @@ export default function CustomSalesPage() {
         if (!product) return it;
         const gross = it.unit_price * it.quantity;
         const discountAmt = gross * (it.discount_pct / 100);
+        const tier = it.price_tier ?? 'retail';
         const repriced = repriceSaleLineUnit(
           product,
           {
             sale_unit_id: unitTypeId,
             sale_unit_qty: it.quantity,
             discount_amount: discountAmt,
-            price_tier: 'retail',
+            price_tier: tier,
           },
-          'retail',
+          tier,
         );
         if (!repriced) return it;
         return {
@@ -804,6 +824,8 @@ export default function CustomSalesPage() {
           discount_amount: discountAmt,
           tax_amount: taxAmt,
           subtotal,
+          price_tier: it.price_tier,
+          is_custom_price: it.original_unit_price != null,
         };
       }),
     subtotal: totals.subtotal,
@@ -930,71 +952,121 @@ export default function CustomSalesPage() {
             <div className="divide-y divide-slate-100">
               {items.map((item, idx) => {
                 const { subtotal } = computeItemTotals(item);
+                const product = item.product_id ? productMap.get(item.product_id) : undefined;
+                const tier = item.price_tier ?? 'retail';
+                const expectedPrice = product
+                  ? repriceSaleLineUnit(
+                      product,
+                      { sale_unit_id: item.sale_unit_id, sale_unit_qty: item.quantity || 1, discount_amount: 0, price_tier: tier },
+                      tier,
+                    )?.unit_price ?? null
+                  : null;
+                const isOverriding = expectedPrice != null && Math.abs((item.unit_price || 0) - expectedPrice) > 0.0001;
+
                 return (
-                  <div
-                    key={item.id}
-                    className="grid grid-cols-1 md:grid-cols-[2fr_80px_70px_90px_70px_70px_80px_36px] gap-2 px-4 py-3 items-center"
-                  >
-                    <div className="md:hidden text-xs text-slate-400 font-medium mb-1">{t('customSales.itemN', { n: idx + 1 })}</div>
-
-                    {/* Product search */}
-                    <ProductSearchCell
-                      item={item}
-                      products={products}
-                      storeDefaultTax={currentStore?.tax_rate ?? 0}
-                      onChange={updateItem}
-                      onOpenQuickAdd={() => setShowQuickAdd(true)}
-                    />
-
-                    <div className="flex justify-center">
-                      {item.product_id && productMap.get(item.product_id) ? (
-                        <InvoiceLineUnitSelect
-                          product={productMap.get(item.product_id)!}
-                          value={item.sale_unit_id}
-                          onChange={(unitId) => handleUnitChange(item.id, unitId)}
-                          compact
-                        />
-                      ) : (
-                        <span className="text-[10px] text-slate-400">—</span>
-                      )}
-                    </div>
-
-                    <Input
-                      type="number" min="0.01" step="0.01" placeholder="Qty"
-                      value={item.quantity || ''}
-                      onChange={(e) => updateItem(item.id, { quantity: parseFloat(e.target.value) || 0 })}
-                      className="h-8 text-sm text-center"
-                    />
-                    <Input
-                      type="number" min="0" step="0.01" placeholder="0.00"
-                      value={item.unit_price || ''}
-                      onChange={(e) => updateItem(item.id, { unit_price: parseFloat(e.target.value) || 0 })}
-                      className="h-8 text-sm text-right"
-                    />
-                    <Input
-                      type="number" min="0" max="100" placeholder="0"
-                      value={item.discount_pct || ''}
-                      onChange={(e) => updateItem(item.id, { discount_pct: parseFloat(e.target.value) || 0 })}
-                      className="h-8 text-sm text-right"
-                    />
-                    <Input
-                      type="number" min="0" max="100" placeholder="0"
-                      value={item.tax_pct || ''}
-                      onChange={(e) => updateItem(item.id, { tax_pct: parseFloat(e.target.value) || 0 })}
-                      className="h-8 text-sm text-right"
-                    />
-                    <div className="h-8 flex items-center justify-end text-sm font-medium text-slate-700">
-                      {fmtCurrency(subtotal, currency)}
-                    </div>
-                    <Button
-                      variant="ghost" size="icon"
-                      className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50"
-                      onClick={() => removeItem(item.id)}
-                      disabled={items.length === 1}
+                  <Fragment key={item.id}>
+                    <div
+                      className="grid grid-cols-1 md:grid-cols-[2fr_80px_70px_90px_70px_70px_80px_36px] gap-2 px-4 py-3 items-center"
                     >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
-                  </div>
+                      <div className="md:hidden text-xs text-slate-400 font-medium mb-1">{t('customSales.itemN', { n: idx + 1 })}</div>
+
+                      {/* Product search */}
+                      <ProductSearchCell
+                        item={item}
+                        products={products}
+                        storeDefaultTax={currentStore?.tax_rate ?? 0}
+                        customer={selectedCustomer}
+                        storeSettings={(currentStore?.settings ?? {}) as Record<string, unknown>}
+                        onChange={updateItem}
+                        onOpenQuickAdd={() => setShowQuickAdd(true)}
+                      />
+
+                      <div className="flex justify-center">
+                        {item.product_id && productMap.get(item.product_id) ? (
+                          <InvoiceLineUnitSelect
+                            product={productMap.get(item.product_id)!}
+                            value={item.sale_unit_id}
+                            onChange={(unitId) => handleUnitChange(item.id, unitId)}
+                            compact
+                          />
+                        ) : (
+                          <span className="text-[10px] text-slate-400">—</span>
+                        )}
+                      </div>
+
+                      <Input
+                        type="number" min="0.01" step="0.01" placeholder="Qty"
+                        value={item.quantity || ''}
+                        onChange={(e) => updateItem(item.id, { quantity: parseFloat(e.target.value) || 0 })}
+                        className="h-8 text-sm text-center"
+                      />
+                      <Input
+                        type="number" min="0" step="0.01" placeholder="0.00"
+                        value={item.unit_price || ''}
+                        onChange={(e) => {
+                          const price = parseFloat(e.target.value) || 0;
+                          const stillOverriding = expectedPrice != null && Math.abs(price - expectedPrice) > 0.0001;
+                          updateItem(item.id, {
+                            unit_price: price,
+                            ...(stillOverriding
+                              ? {}
+                              : { original_unit_price: null, price_override_reason: null }),
+                          });
+                        }}
+                        disabled={!!product && isOverriding && !canOverridePrice}
+                        className={cn('h-8 text-sm text-right', isOverriding && canOverridePrice && 'border-amber-400')}
+                      />
+                      <Input
+                        type="number" min="0" max="100" placeholder="0"
+                        value={item.discount_pct || ''}
+                        onChange={(e) => updateItem(item.id, { discount_pct: parseFloat(e.target.value) || 0 })}
+                        className="h-8 text-sm text-right"
+                      />
+                      <Input
+                        type="number" min="0" max="100" placeholder="0"
+                        value={item.tax_pct || ''}
+                        onChange={(e) => updateItem(item.id, { tax_pct: parseFloat(e.target.value) || 0 })}
+                        className="h-8 text-sm text-right"
+                      />
+                      <div className="h-8 flex items-center justify-end text-sm font-medium text-slate-700">
+                        {fmtCurrency(subtotal, currency)}
+                      </div>
+                      <Button
+                        variant="ghost" size="icon"
+                        className="h-8 w-8 text-slate-400 hover:text-red-500 hover:bg-red-50"
+                        onClick={() => removeItem(item.id)}
+                        disabled={items.length === 1}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+
+                    {isOverriding && (
+                      <div className="px-4 pb-3 -mt-1">
+                        {canOverridePrice ? (
+                          <div className="rounded-lg border border-amber-200 bg-amber-50 p-2.5 space-y-1.5">
+                            <p className="text-[11px] font-medium text-amber-800">
+                              Price overridden — system price is {fmtCurrency(expectedPrice ?? 0, currency)}
+                            </p>
+                            <Input
+                              value={item.price_override_reason ?? ''}
+                              onChange={(e) => updateItem(item.id, {
+                                original_unit_price: expectedPrice,
+                                price_override_reason: e.target.value,
+                              })}
+                              placeholder="Reason for this price change…"
+                              className="h-8 text-xs bg-white"
+                            />
+                          </div>
+                        ) : (
+                          <p className="text-[11px] text-red-600">
+                            This price differs from the system price ({fmtCurrency(expectedPrice ?? 0, currency)}) —
+                            only owners/managers can override it. Ask them, or enable it in Settings.
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </Fragment>
                 );
               })}
             </div>

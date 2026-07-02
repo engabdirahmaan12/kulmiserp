@@ -28,6 +28,18 @@ export function getPosAllowPriceOverride(settings: Record<string, unknown> | und
   return settings?.pos_allow_price_override === true;
 }
 
+/** Whether Price Levels (VIP tier) can be assigned to new customers/products.
+ *  Defaults to on — VIP already ships and works; this is an opt-out. */
+export function getPriceLevelsEnabled(settings: Record<string, unknown> | undefined): boolean {
+  return settings?.pricing_enable_price_levels !== false;
+}
+
+/** Whether new Quantity/bulk-break price rows can be configured on a product.
+ *  Defaults to on for the same reason as above. */
+export function getQuantityPricingEnabled(settings: Record<string, unknown> | undefined): boolean {
+  return settings?.pricing_enable_quantity_pricing !== false;
+}
+
 export function recalcLineSubtotal(
   quantity: number,
   unitPrice: number,

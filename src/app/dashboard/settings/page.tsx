@@ -25,7 +25,7 @@ import { InventorySettingsPanel } from '@/components/inventory/InventorySettings
 import { LanguageSettingsPanel } from '@/components/i18n/LanguageSettingsPanel';
 import { StoreBrandingPanel } from '@/components/settings/StoreBrandingPanel';
 import { PosSettingsPanel } from '@/components/settings/PosSettingsPanel';
-import { BusinessConfigurationPanel } from '@/components/settings/BusinessConfigurationPanel';
+import { PricingConfigurationPanel } from '@/components/settings/PricingConfigurationPanel';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 
 const storeSchema = z.object({
@@ -223,7 +223,7 @@ function SettingsPageInner() {
             </TabsTrigger>
             <TabsTrigger value="business" className="gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
               <Building2 className="h-4 w-4" />
-              Business
+              Pricing
             </TabsTrigger>
             <TabsTrigger value="pos" className="gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
               <ShoppingCart className="h-4 w-4" />
@@ -398,7 +398,7 @@ function SettingsPageInner() {
           </TabsContent>
 
           <TabsContent value="business" className="mt-4">
-            <BusinessConfigurationPanel />
+            <PricingConfigurationPanel />
           </TabsContent>
 
           <TabsContent value="pos" className="mt-4">

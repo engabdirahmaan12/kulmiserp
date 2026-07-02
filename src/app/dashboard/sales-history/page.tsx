@@ -642,6 +642,8 @@ function SaleDetailView({
       discount_amount: it.discount_amount,
       tax_amount: it.tax_amount,
       subtotal: it.subtotal,
+      price_tier: it.price_tier,
+      is_custom_price: it.original_unit_price != null,
     })),
     subtotal: sale.subtotal,
     discount_amount: sale.discount_amount,

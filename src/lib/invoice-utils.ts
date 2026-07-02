@@ -19,6 +19,10 @@ export interface InvoiceLineItem {
   tax_amount?: number;
   tax_rate?: number;
   subtotal: number;
+  /** Price level applied to this line: retail / wholesale / vip / distributor. */
+  price_tier?: string;
+  /** Set when this line's price was manually overridden at checkout. */
+  is_custom_price?: boolean;
 }
 
 /** Display qty with optional unit code and base-qty hint for multi-unit lines. */

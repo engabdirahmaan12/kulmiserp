@@ -22,6 +22,26 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { InvoiceTheme } from '@/types';
+import { PRICE_TIER_LABELS, type PriceTier } from '@/lib/units/conversion';
+import type { InvoiceLineItem } from '@/lib/invoice-utils';
+
+function LineTierBadges({ item }: { item: InvoiceLineItem }) {
+  if (!item.price_tier && !item.is_custom_price) return null;
+  return (
+    <div className="flex items-center gap-1 mt-0.5 flex-wrap">
+      {item.price_tier && item.price_tier !== 'retail' && (
+        <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-violet-50 text-violet-600 border border-violet-200">
+          {PRICE_TIER_LABELS[item.price_tier as PriceTier] ?? item.price_tier}
+        </span>
+      )}
+      {item.is_custom_price && (
+        <span className="text-[9px] font-medium px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+          Custom
+        </span>
+      )}
+    </div>
+  );
+}
 
 interface InvoiceDocumentProps {
   data: InvoiceData;
@@ -444,6 +464,7 @@ function CorporateLayout({
                   {opts.showSku && item.sku && (
                     <p className="text-[10px] text-slate-400 mt-0.5">SKU: {item.sku}</p>
                   )}
+                  <LineTierBadges item={item} />
                 </td>
                 <td className={cn('text-center text-slate-600', compact ? 'px-1 py-2 text-xs' : 'px-3 py-3')}>{formatInvoiceLineQty(item)}</td>
                 <td className={cn('text-right text-slate-600 tabular-nums', compact ? 'px-1 py-2 text-xs' : 'px-3 py-3')}>
@@ -628,6 +649,7 @@ function MinimalLayout({
                 <td className={cn('py-2', compact && 'text-xs')}>
                   <p className="font-medium text-slate-900">{item.name}</p>
                   {opts.showSku && item.sku && <p className="text-[10px] text-slate-400">{item.sku}</p>}
+                  <LineTierBadges item={item} />
                 </td>
                 <td className={cn('text-center text-slate-600', compact ? 'py-2 text-xs' : 'py-3')}>{formatInvoiceLineQty(item)}</td>
                 <td className={cn('text-right text-slate-600 tabular-nums', compact ? 'py-2 text-xs' : 'py-3')}>{fmt(item.unit_price, currency)}</td>
@@ -727,7 +749,13 @@ function ThermalLayout({
         <tbody>
           {data.items.map((item, i) => (
             <tr key={i} className="border-b border-dotted border-slate-200">
-              <td className="py-1">{item.name}</td>
+              <td className="py-1">
+                {item.name}
+                {item.price_tier && item.price_tier !== 'retail' && !item.is_custom_price && (
+                  <span className="text-slate-400"> ({PRICE_TIER_LABELS[item.price_tier as PriceTier] ?? item.price_tier})</span>
+                )}
+                {item.is_custom_price && <span className="text-amber-600"> *custom</span>}
+              </td>
               <td className="text-center">{formatInvoiceLineQty(item)}</td>
               <td className="text-right tabular-nums">{fmtMoney(item.unit_price, currency).replace('$', '')}</td>
               <td className="text-right font-bold tabular-nums">{fmtMoney(item.subtotal, currency).replace('$', '')}</td>

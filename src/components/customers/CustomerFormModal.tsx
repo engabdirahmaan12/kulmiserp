@@ -18,6 +18,7 @@ import { Loader2, Users, ArrowLeft } from 'lucide-react';
 import { toast } from 'sonner';
 import type { Customer } from '@/types';
 import { PRICE_TIER_LABELS } from '@/lib/units/conversion';
+import { getPriceLevelsEnabled } from '@/lib/pos/pricing';
 import type { PriceTier } from '@/lib/units/conversion';
 
 const schema = z.object({
@@ -50,6 +51,10 @@ export function CustomerFormModal({ open, customer, onClose, onCreated }: Custom
   });
 
   const priceTier = watch('price_tier');
+  const priceLevelsEnabled = getPriceLevelsEnabled(currentStore?.settings as Record<string, unknown> | undefined);
+  const priceTierOptions = (Object.keys(PRICE_TIER_LABELS) as PriceTier[]).filter(
+    (tier) => priceLevelsEnabled || tier !== 'vip',
+  );
 
   useEffect(() => {
     if (customer) {
@@ -150,7 +155,7 @@ export function CustomerFormModal({ open, customer, onClose, onCreated }: Custom
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {(Object.keys(PRICE_TIER_LABELS) as PriceTier[]).map((tier) => (
+                  {priceTierOptions.map((tier) => (
                     <SelectItem key={tier} value={tier}>{PRICE_TIER_LABELS[tier]}</SelectItem>
                   ))}
                 </SelectContent>

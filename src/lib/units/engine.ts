@@ -23,6 +23,8 @@ export {
   productBaseUnitCode,
   formatAlternateStockSummary,
 } from '@/lib/units/conversion';
+export type { QuantityPriceRow } from '@/lib/units/conversion';
+export { resolveQuantityPrice } from '@/lib/units/quantityPricing';
 
 export {
   getSaleUnitsForProduct,
@@ -57,6 +59,10 @@ export interface SaleLineCore {
   tax_amount: number;
   subtotal: number;
   price_tier?: PriceTier;
+  /** Set when a manual price override was applied — audit trail. */
+  original_unit_price?: number | null;
+  price_override_reason?: string | null;
+  price_overridden_by?: string | null;
 }
 
 export function lineBaseQty(saleUnitQty: number, conversionFactor: number): number {
@@ -97,6 +103,9 @@ export function cartItemToSaleLine(item: CartItem): SaleLineCore {
     tax_amount: item.tax_amount,
     subtotal: lineNet + item.tax_amount,
     price_tier: item.price_tier,
+    original_unit_price: item.original_unit_price ?? null,
+    price_override_reason: item.price_override_reason ?? null,
+    price_overridden_by: item.price_overridden_by ?? null,
   };
 }
 
@@ -116,6 +125,9 @@ export function saleLineToRpcPayload(line: SaleLineCore) {
     discount_amount: line.discount_amount,
     tax_amount: line.tax_amount,
     subtotal: line.unit_price * line.sale_unit_qty - line.discount_amount,
+    original_unit_price: line.original_unit_price ?? null,
+    price_override_reason: line.price_override_reason ?? null,
+    price_overridden_by: line.price_overridden_by ?? null,
   };
 }
 
@@ -141,6 +153,9 @@ export function saleLineToDraftRow(
     sale_unit_qty: line.sale_unit_qty,
     base_qty: line.base_qty,
     price_tier: line.price_tier ?? 'retail',
+    original_unit_price: line.original_unit_price ?? null,
+    price_override_reason: line.price_override_reason ?? null,
+    price_overridden_by: line.price_overridden_by ?? null,
   };
 }
 
@@ -163,6 +178,9 @@ export function dbSaleItemToSaleLine(row: SaleItem): SaleLineCore {
     tax_amount: Number(row.tax_amount) || 0,
     subtotal: Number(row.subtotal) || 0,
     price_tier: (row.price_tier as PriceTier) ?? 'retail',
+    original_unit_price: row.original_unit_price ?? null,
+    price_override_reason: row.price_override_reason ?? null,
+    price_overridden_by: row.price_overridden_by ?? null,
   };
 }
 
@@ -174,7 +192,7 @@ export function repriceSaleLineUnit(
   const units = getSaleUnitsForProduct(product);
   const unit = units.find((u) => u.unit_type_id === line.sale_unit_id) ?? pickDefaultSaleUnit(product);
   if (!unit) return null;
-  const unitPrice = saleUnitPriceForProduct(product, unit, tier);
+  const unitPrice = saleUnitPriceForProduct(product, unit, tier, line.sale_unit_qty);
   const conv = unit.conversion_factor ?? 1;
   const base = toBaseQty(line.sale_unit_qty, conv);
   const lineNet = unitPrice * line.sale_unit_qty - line.discount_amount;

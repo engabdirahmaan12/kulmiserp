@@ -23,6 +23,7 @@ import { PageShell } from '@/components/layout/PageShell';
 import { cn } from '@/lib/utils';
 import { inputSoft } from '@/lib/ui-classes';
 import { PALETTE } from '@/lib/chart-utils';
+import { PRICE_TIER_LABELS } from '@/lib/units/conversion';
 import type { ReportsChartsPanelProps } from '@/components/reports/ReportsChartsPanel';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
@@ -154,7 +155,7 @@ export default function ReportsPage() {
         .from('sale_items')
         .select(`
           product_name, product_sku, sale_unit_code, sale_unit_qty, base_qty, quantity,
-          unit_price, cost_price, subtotal, price_tier,
+          unit_price, cost_price, subtotal, price_tier, original_unit_price,
           sale:sales!inner(invoice_number, sale_date, status, store_id)
         `)
         .eq('sale.store_id', currentStore!.id)
@@ -332,6 +333,7 @@ export default function ReportsPage() {
         row.sale_unit_code ?? '',
         baseQty,
         row.price_tier ?? 'retail',
+        row.original_unit_price != null ? 'Yes' : 'No',
         Number(row.unit_price).toFixed(2),
         Number(row.subtotal).toFixed(2),
         cogs.toFixed(2),
@@ -339,10 +341,33 @@ export default function ReportsPage() {
       ];
     });
     return [
-      ['Invoice', 'Date', 'Product', 'SKU', 'Qty Sold', 'Unit', 'Base Qty', 'Tier', 'Unit Price', 'Revenue', 'COGS', 'Profit'],
+      ['Invoice', 'Date', 'Product', 'SKU', 'Qty Sold', 'Unit', 'Base Qty', 'Tier', 'Custom', 'Unit Price', 'Revenue', 'COGS', 'Profit'],
       ...rows,
     ].map((r) => r.join(',')).join('\n');
   };
+
+  const tierBreakdown = useMemo(() => {
+    const buckets: Record<'retail' | 'wholesale' | 'vip' | 'distributor' | 'custom', { revenue: number; qty: number; count: number }> = {
+      retail: { revenue: 0, qty: 0, count: 0 },
+      wholesale: { revenue: 0, qty: 0, count: 0 },
+      vip: { revenue: 0, qty: 0, count: 0 },
+      distributor: { revenue: 0, qty: 0, count: 0 },
+      custom: { revenue: 0, qty: 0, count: 0 },
+    };
+    for (const row of saleLineExport) {
+      const tier = (row.price_tier ?? 'retail') as keyof typeof buckets;
+      const bucket = buckets[tier] ?? buckets.retail;
+      bucket.revenue += Number(row.subtotal) || 0;
+      bucket.qty += Number(row.sale_unit_qty ?? row.quantity ?? 0);
+      bucket.count += 1;
+      if (row.original_unit_price != null) {
+        buckets.custom.revenue += Number(row.subtotal) || 0;
+        buckets.custom.qty += Number(row.sale_unit_qty ?? row.quantity ?? 0);
+        buckets.custom.count += 1;
+      }
+    }
+    return buckets;
+  }, [saleLineExport]);
 
   const downloadCsv = (content: string, filename: string) => {
     if (!content) return;
@@ -530,6 +555,7 @@ export default function ReportsPage() {
                 { id: 'overview', label: t('reports.tabOverview') },
                 { id: 'sales', label: t('reports.tabSales') },
                 { id: 'products', label: t('reports.tabProducts') },
+                { id: 'pricing', label: 'Pricing' },
               ]}
               active={activeTab}
               onChange={setActiveTab}
@@ -655,6 +681,65 @@ export default function ReportsPage() {
                     )}
                   </tbody>
                 </table>
+              </ReportTableShell>
+            )}
+
+            {activeTab === 'pricing' && (
+              <ReportTableShell className="border-0 shadow-none rounded-xl">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                      <th className={reportTableHead}>Price Level</th>
+                      <th className={reportTableHeadRight}>Lines</th>
+                      <th className={reportTableHeadRight}>Qty Sold</th>
+                      <th className={reportTableHeadRight}>Revenue</th>
+                      <th className={cn(reportTableHeadRight, 'hidden sm:table-cell')}>Share</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                    {(['retail', 'wholesale', 'vip', 'distributor'] as const).map((tier) => {
+                      const b = tierBreakdown[tier];
+                      const share = totals && totals.revenue > 0 ? (b.revenue / totals.revenue) * 100 : 0;
+                      return (
+                        <tr key={tier} className="hover:bg-slate-50/80 transition-colors dark:hover:bg-slate-800/50">
+                          <td className="px-4 py-2.5 font-medium text-slate-900 dark:text-slate-200">
+                            {PRICE_TIER_LABELS[tier]}
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-slate-500 tabular-nums">{fmt(b.count)}</td>
+                          <td className="px-4 py-2.5 text-right text-slate-500 tabular-nums">{fmt(b.qty)}</td>
+                          <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{fmtC(b.revenue)}</td>
+                          <td className="px-4 py-2.5 text-right text-slate-500 hidden sm:table-cell tabular-nums">
+                            {share.toFixed(1)}%
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    <tr className="bg-amber-50/60 dark:bg-amber-900/10">
+                      <td className="px-4 py-2.5 font-medium text-amber-800 dark:text-amber-400">
+                        Custom Price (overridden)
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-amber-700 tabular-nums">{fmt(tierBreakdown.custom.count)}</td>
+                      <td className="px-4 py-2.5 text-right text-amber-700 tabular-nums">{fmt(tierBreakdown.custom.qty)}</td>
+                      <td className="px-4 py-2.5 text-right font-semibold text-amber-800 tabular-nums">
+                        {fmtC(tierBreakdown.custom.revenue)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-amber-700 hidden sm:table-cell tabular-nums">
+                        {totals && totals.revenue > 0 ? ((tierBreakdown.custom.revenue / totals.revenue) * 100).toFixed(1) : '0.0'}%
+                      </td>
+                    </tr>
+                    {!saleLineExport.length && (
+                      <tr>
+                        <td colSpan={5} className="text-center py-12 text-slate-400">
+                          {t('reports.noSales')}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+                <p className="px-4 py-2 text-[11px] text-slate-400">
+                  Custom Price is counted separately — a line already appears in its price level row above and
+                  again here if it was manually overridden at checkout.
+                </p>
               </ReportTableShell>
             )}
           </div>

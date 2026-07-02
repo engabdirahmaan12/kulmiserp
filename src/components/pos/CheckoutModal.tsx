@@ -391,6 +391,8 @@ export function CheckoutModal({ open, onClose, products, onComplete }: CheckoutM
           discount_amount: i.discount_amount,
           tax_amount:     i.tax_amount * i.quantity,
           subtotal:       i.unit_price * i.quantity - i.discount_amount,
+          price_tier:     i.price_tier,
+          is_custom_price: i.original_unit_price != null,
         })),
         subtotal,
         discount_amount:  discountAmt,

@@ -30,6 +30,7 @@ import { toBaseUnitCost } from '@/lib/units/conversion';
 import { PRODUCT_SALES_MODE_LABELS, type ProductSalesMode } from '@/lib/units/conversion';
 import type { ProductUnit, QuantityPriceRow, UnitType } from '@/types';
 import { Switch } from '@/components/ui/switch';
+import { getPriceLevelsEnabled, getQuantityPricingEnabled } from '@/lib/pos/pricing';
 
 /** Stable fallback — avoid `= []` in useQuery destructuring (new ref every render). */
 const EMPTY_PRODUCT_UNITS: ProductUnit[] = [];
@@ -790,7 +791,13 @@ export function ProductFormModal({ open, product, onClose }: ProductFormModalPro
 
             {/* Units & pricing */}
             {unitTypes.length > 0 ? (
-              <ProductUnitsEditor unitTypes={unitTypes} value={unitsForm} onChange={setUnitsForm} />
+              <ProductUnitsEditor
+                unitTypes={unitTypes}
+                value={unitsForm}
+                onChange={setUnitsForm}
+                priceLevelsEnabled={getPriceLevelsEnabled(currentStore?.settings as Record<string, unknown> | undefined)}
+                quantityPricingEnabled={getQuantityPricingEnabled(currentStore?.settings as Record<string, unknown> | undefined)}
+              />
             ) : (
               <div className="grid grid-cols-2 gap-4">
                 <OutlinedField label="Cost">

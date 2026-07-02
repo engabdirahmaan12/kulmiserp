@@ -33,6 +33,10 @@ interface ProductUnitsEditorProps {
   unitTypes: UnitType[];
   value: ProductUnitsFormState;
   onChange: (next: ProductUnitsFormState) => void;
+  /** Store setting: Price Levels (VIP tier). Defaults to on. */
+  priceLevelsEnabled?: boolean;
+  /** Store setting: Quantity/bulk-break pricing. Defaults to on. */
+  quantityPricingEnabled?: boolean;
 }
 
 function emptySaleUnit(unitTypes: UnitType[], baseUnitId: string): ProductUnitOption {
@@ -57,7 +61,13 @@ function emptyQuantityBreak(): QuantityPriceRow {
 
 const QTY_PRICE_TIERS: PriceTier[] = ['retail', 'wholesale', 'vip'];
 
-export function ProductUnitsEditor({ unitTypes, value, onChange }: ProductUnitsEditorProps) {
+export function ProductUnitsEditor({
+  unitTypes,
+  value,
+  onChange,
+  priceLevelsEnabled = true,
+  quantityPricingEnabled = true,
+}: ProductUnitsEditorProps) {
   const baseUnits = useMemo(() => {
     const bases = unitTypes.filter((u) => u.unit_kind === 'base' || u.unit_kind === 'both');
     return bases.length > 0 ? bases : unitTypes;
@@ -231,17 +241,19 @@ export function ProductUnitsEditor({ unitTypes, value, onChange }: ProductUnitsE
             onChange={(e) => update({ wholesale_price: Number(e.target.value) || 0 })}
           />
         </div>
-        <div className="space-y-1.5">
-          <Label className="text-violet-700">VIP price</Label>
-          <Input
-            type="number"
-            min={0}
-            step="any"
-            className="rounded-xl h-11 border-violet-200"
-            value={value.vip_price}
-            onChange={(e) => update({ vip_price: Number(e.target.value) || 0 })}
-          />
-        </div>
+        {priceLevelsEnabled && (
+          <div className="space-y-1.5">
+            <Label className="text-violet-700">VIP price</Label>
+            <Input
+              type="number"
+              min={0}
+              step="any"
+              className="rounded-xl h-11 border-violet-200"
+              value={value.vip_price}
+              onChange={(e) => update({ vip_price: Number(e.target.value) || 0 })}
+            />
+          </div>
+        )}
         <div className="space-y-1.5">
           <Label>Distributor price</Label>
           <Input
@@ -339,17 +351,19 @@ export function ProductUnitsEditor({ unitTypes, value, onChange }: ProductUnitsE
                     onChange={(e) => updateSaleUnit(index, { wholesale_price: Number(e.target.value) || null })}
                   />
                 </div>
-                <div className="space-y-1">
-                  <Label className="text-xs text-violet-700">VIP</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    step="any"
-                    className="rounded-lg h-10 border-violet-200"
-                    value={su.vip_price ?? ''}
-                    onChange={(e) => updateSaleUnit(index, { vip_price: Number(e.target.value) || null })}
-                  />
-                </div>
+                {priceLevelsEnabled && (
+                  <div className="space-y-1">
+                    <Label className="text-xs text-violet-700">VIP</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step="any"
+                      className="rounded-lg h-10 border-violet-200"
+                      value={su.vip_price ?? ''}
+                      onChange={(e) => updateSaleUnit(index, { vip_price: Number(e.target.value) || null })}
+                    />
+                  </div>
+                )}
                 <div className="sm:col-span-2 space-y-1">
                   <Label className="text-xs">Barcode</Label>
                   <Input
@@ -374,87 +388,89 @@ export function ProductUnitsEditor({ unitTypes, value, onChange }: ProductUnitsE
               </div>
 
               {/* Quantity / bulk-break pricing for this unit */}
-              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/60 p-2.5 space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
-                    <Layers className="h-3.5 w-3.5 text-slate-400" />
-                    Quantity pricing
-                    <span className="text-slate-400 font-normal">(optional bulk-break prices for this unit)</span>
+              {quantityPricingEnabled && (
+                <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/60 p-2.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+                      <Layers className="h-3.5 w-3.5 text-slate-400" />
+                      Quantity pricing
+                      <span className="text-slate-400 font-normal">(optional bulk-break prices for this unit)</span>
+                    </div>
+                    <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={addBreak}>
+                      <Plus className="h-3 w-3 mr-1" /> Add break
+                    </Button>
                   </div>
-                  <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={addBreak}>
-                    <Plus className="h-3 w-3 mr-1" /> Add break
-                  </Button>
-                </div>
-                {breaks.length === 0 ? (
-                  <p className="text-[11px] text-slate-400 italic">
-                    e.g. 1–9 = {su.retail_price ?? (value.retail_price || 0)}, 10–49 = lower price, 50+ = lowest price
-                  </p>
-                ) : (
-                  <div className="space-y-1.5">
-                    {breaks.map((b, bIndex) => (
-                      <div key={bIndex} className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-1.5 items-end">
-                        <div className="space-y-0.5">
-                          {bIndex === 0 && <Label className="text-[10px] text-slate-500">Min qty</Label>}
-                          <Input
-                            type="number"
-                            min={0.001}
-                            step="any"
-                            className="h-8 text-xs"
-                            value={b.min_qty}
-                            onChange={(e) => updateBreak(bIndex, { min_qty: Number(e.target.value) || 0.001 })}
-                          />
-                        </div>
-                        <div className="space-y-0.5">
-                          {bIndex === 0 && <Label className="text-[10px] text-slate-500">Max qty</Label>}
-                          <Input
-                            type="number"
-                            min={0}
-                            step="any"
-                            placeholder="and above"
-                            className="h-8 text-xs"
-                            value={b.max_qty ?? ''}
-                            onChange={(e) => updateBreak(bIndex, { max_qty: e.target.value === '' ? null : Number(e.target.value) })}
-                          />
-                        </div>
-                        <div className="space-y-0.5">
-                          {bIndex === 0 && <Label className="text-[10px] text-slate-500">Tier</Label>}
-                          <Select
-                            value={b.price_tier}
-                            onValueChange={(v) => v && updateBreak(bIndex, { price_tier: v as PriceTier })}
+                  {breaks.length === 0 ? (
+                    <p className="text-[11px] text-slate-400 italic">
+                      e.g. 1–9 = {su.retail_price ?? (value.retail_price || 0)}, 10–49 = lower price, 50+ = lowest price
+                    </p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {breaks.map((b, bIndex) => (
+                        <div key={bIndex} className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-1.5 items-end">
+                          <div className="space-y-0.5">
+                            {bIndex === 0 && <Label className="text-[10px] text-slate-500">Min qty</Label>}
+                            <Input
+                              type="number"
+                              min={0.001}
+                              step="any"
+                              className="h-8 text-xs"
+                              value={b.min_qty}
+                              onChange={(e) => updateBreak(bIndex, { min_qty: Number(e.target.value) || 0.001 })}
+                            />
+                          </div>
+                          <div className="space-y-0.5">
+                            {bIndex === 0 && <Label className="text-[10px] text-slate-500">Max qty</Label>}
+                            <Input
+                              type="number"
+                              min={0}
+                              step="any"
+                              placeholder="and above"
+                              className="h-8 text-xs"
+                              value={b.max_qty ?? ''}
+                              onChange={(e) => updateBreak(bIndex, { max_qty: e.target.value === '' ? null : Number(e.target.value) })}
+                            />
+                          </div>
+                          <div className="space-y-0.5">
+                            {bIndex === 0 && <Label className="text-[10px] text-slate-500">Tier</Label>}
+                            <Select
+                              value={b.price_tier}
+                              onValueChange={(v) => v && updateBreak(bIndex, { price_tier: v as PriceTier })}
+                            >
+                              <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                {QTY_PRICE_TIERS.map((t) => (
+                                  <SelectItem key={t} value={t}>{PRICE_TIER_LABELS[t]}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-0.5">
+                            {bIndex === 0 && <Label className="text-[10px] text-slate-500">Price</Label>}
+                            <Input
+                              type="number"
+                              min={0}
+                              step="any"
+                              className="h-8 text-xs"
+                              value={b.price}
+                              onChange={(e) => updateBreak(bIndex, { price: Number(e.target.value) || 0 })}
+                            />
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className={cn('h-8 w-8 text-red-400', bIndex === 0 && 'mt-4')}
+                            onClick={() => removeBreak(bIndex)}
                           >
-                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
-                            <SelectContent>
-                              {QTY_PRICE_TIERS.map((t) => (
-                                <SelectItem key={t} value={t}>{PRICE_TIER_LABELS[t]}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
                         </div>
-                        <div className="space-y-0.5">
-                          {bIndex === 0 && <Label className="text-[10px] text-slate-500">Price</Label>}
-                          <Input
-                            type="number"
-                            min={0}
-                            step="any"
-                            className="h-8 text-xs"
-                            value={b.price}
-                            onChange={(e) => updateBreak(bIndex, { price: Number(e.target.value) || 0 })}
-                          />
-                        </div>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className={cn('h-8 w-8 text-red-400', bIndex === 0 && 'mt-4')}
-                          onClick={() => removeBreak(bIndex)}
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
 
               <div className="flex justify-end">
                 <Button type="button" variant="ghost" size="sm" className="text-red-500 h-8 text-xs" onClick={() => removeSaleUnit(index)}>
