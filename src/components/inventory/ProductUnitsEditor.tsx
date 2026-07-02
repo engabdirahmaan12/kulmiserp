@@ -5,11 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2 } from 'lucide-react';
-import type { ProductUnitOption } from '@/lib/units/conversion';
-import { profitAtUnit, toBaseUnitCost } from '@/lib/units/conversion';
+import { Plus, Trash2, Layers } from 'lucide-react';
+import type { PriceTier, ProductUnitOption, QuantityPriceRow } from '@/lib/units/conversion';
+import { PRICE_TIER_LABELS, profitAtUnit, toBaseUnitCost } from '@/lib/units/conversion';
 import { toSelectItems } from '@/lib/ui/select-utils';
 import type { UnitType } from '@/types';
+import { cn } from '@/lib/utils';
 
 function unitLabel(u: UnitType) {
   return `${u.name} (${u.code})`;
@@ -24,6 +25,7 @@ export interface ProductUnitsFormState {
   retail_price: number;
   wholesale_price: number;
   distributor_price: number;
+  vip_price: number;
   sale_units: ProductUnitOption[];
 }
 
@@ -43,9 +45,17 @@ function emptySaleUnit(unitTypes: UnitType[], baseUnitId: string): ProductUnitOp
     retail_price: null,
     wholesale_price: null,
     distributor_price: null,
+    vip_price: null,
+    quantity_prices: [],
     barcode: null,
   };
 }
+
+function emptyQuantityBreak(): QuantityPriceRow {
+  return { price_tier: 'retail', min_qty: 1, max_qty: null, price: 0 };
+}
+
+const QTY_PRICE_TIERS: PriceTier[] = ['retail', 'wholesale', 'vip'];
 
 export function ProductUnitsEditor({ unitTypes, value, onChange }: ProductUnitsEditorProps) {
   const baseUnits = useMemo(() => {
@@ -198,7 +208,7 @@ export function ProductUnitsEditor({ unitTypes, value, onChange }: ProductUnitsE
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="space-y-1.5">
           <Label>Retail price (default sale)</Label>
           <Input
@@ -219,6 +229,17 @@ export function ProductUnitsEditor({ unitTypes, value, onChange }: ProductUnitsE
             className="rounded-xl h-11"
             value={value.wholesale_price}
             onChange={(e) => update({ wholesale_price: Number(e.target.value) || 0 })}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label className="text-violet-700">VIP price</Label>
+          <Input
+            type="number"
+            min={0}
+            step="any"
+            className="rounded-xl h-11 border-violet-200"
+            value={value.vip_price}
+            onChange={(e) => update({ vip_price: Number(e.target.value) || 0 })}
           />
         </div>
         <div className="space-y-1.5">
@@ -253,86 +274,196 @@ export function ProductUnitsEditor({ unitTypes, value, onChange }: ProductUnitsE
           </p>
         )}
 
-        {value.sale_units.map((su, index) => (
-          <div key={index} className="grid gap-3 sm:grid-cols-8 items-end rounded-lg border border-slate-200 bg-white p-3">
-            <div className="sm:col-span-2 space-y-1">
-              <Label className="text-xs">Unit name</Label>
-              <Select
-                items={allUnitItems}
-                value={su.unit_type_id}
-                onValueChange={(v) => updateSaleUnit(index, { unit_type_id: v ?? '' })}
-              >
-                <SelectTrigger className="rounded-lg h-10">
-                  <SelectValue placeholder="Select unit" />
-                </SelectTrigger>
-                <SelectContent>
-                  {allUnitItems.map((item) => (
-                    <SelectItem key={item.value} value={item.value} label={String(item.label)}>
-                      {item.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+        {value.sale_units.map((su, index) => {
+          const breaks = su.quantity_prices ?? [];
+          const updateBreak = (bIndex: number, patch: Partial<QuantityPriceRow>) => {
+            const next = breaks.map((b, i) => (i === bIndex ? { ...b, ...patch } : b));
+            updateSaleUnit(index, { quantity_prices: next });
+          };
+          const addBreak = () => updateSaleUnit(index, { quantity_prices: [...breaks, emptyQuantityBreak()] });
+          const removeBreak = (bIndex: number) =>
+            updateSaleUnit(index, { quantity_prices: breaks.filter((_, i) => i !== bIndex) });
+
+          return (
+            <div key={index} className="space-y-3 rounded-lg border border-slate-200 bg-white p-3">
+              <div className="grid gap-3 sm:grid-cols-9 items-end">
+                <div className="sm:col-span-2 space-y-1">
+                  <Label className="text-xs">Unit name</Label>
+                  <Select
+                    items={allUnitItems}
+                    value={su.unit_type_id}
+                    onValueChange={(v) => updateSaleUnit(index, { unit_type_id: v ?? '' })}
+                  >
+                    <SelectTrigger className="rounded-lg h-10">
+                      <SelectValue placeholder="Select unit" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allUnitItems.map((item) => (
+                        <SelectItem key={item.value} value={item.value} label={String(item.label)}>
+                          {item.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">= {baseUnitCode} qty</Label>
+                  <Input
+                    type="number"
+                    min={0.000001}
+                    step="any"
+                    className="rounded-lg h-10"
+                    value={su.conversion_factor}
+                    onChange={(e) => updateSaleUnit(index, { conversion_factor: Number(e.target.value) || 1 })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Retail</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="any"
+                    className="rounded-lg h-10"
+                    value={su.retail_price ?? ''}
+                    onChange={(e) => updateSaleUnit(index, { retail_price: Number(e.target.value) || null })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Wholesale</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="any"
+                    className="rounded-lg h-10"
+                    value={su.wholesale_price ?? ''}
+                    onChange={(e) => updateSaleUnit(index, { wholesale_price: Number(e.target.value) || null })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs text-violet-700">VIP</Label>
+                  <Input
+                    type="number"
+                    min={0}
+                    step="any"
+                    className="rounded-lg h-10 border-violet-200"
+                    value={su.vip_price ?? ''}
+                    onChange={(e) => updateSaleUnit(index, { vip_price: Number(e.target.value) || null })}
+                  />
+                </div>
+                <div className="sm:col-span-2 space-y-1">
+                  <Label className="text-xs">Barcode</Label>
+                  <Input
+                    className="rounded-lg h-10 font-mono text-xs"
+                    placeholder="Optional"
+                    value={su.barcode ?? ''}
+                    onChange={(e) => updateSaleUnit(index, { barcode: e.target.value.trim() || null })}
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-xs">Default</Label>
+                  <Button
+                    type="button"
+                    variant={su.is_default_sale ? 'default' : 'outline'}
+                    size="sm"
+                    className="h-10 w-full rounded-lg text-xs"
+                    onClick={() => updateSaleUnit(index, { is_default_sale: true })}
+                  >
+                    {su.is_default_sale ? 'Default' : 'Set default'}
+                  </Button>
+                </div>
+              </div>
+
+              {/* Quantity / bulk-break pricing for this unit */}
+              <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50/60 p-2.5 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-medium text-slate-600">
+                    <Layers className="h-3.5 w-3.5 text-slate-400" />
+                    Quantity pricing
+                    <span className="text-slate-400 font-normal">(optional bulk-break prices for this unit)</span>
+                  </div>
+                  <Button type="button" variant="ghost" size="sm" className="h-7 text-xs" onClick={addBreak}>
+                    <Plus className="h-3 w-3 mr-1" /> Add break
+                  </Button>
+                </div>
+                {breaks.length === 0 ? (
+                  <p className="text-[11px] text-slate-400 italic">
+                    e.g. 1–9 = {su.retail_price ?? (value.retail_price || 0)}, 10–49 = lower price, 50+ = lowest price
+                  </p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {breaks.map((b, bIndex) => (
+                      <div key={bIndex} className="grid grid-cols-[1fr_1fr_1fr_1fr_auto] gap-1.5 items-end">
+                        <div className="space-y-0.5">
+                          {bIndex === 0 && <Label className="text-[10px] text-slate-500">Min qty</Label>}
+                          <Input
+                            type="number"
+                            min={0.001}
+                            step="any"
+                            className="h-8 text-xs"
+                            value={b.min_qty}
+                            onChange={(e) => updateBreak(bIndex, { min_qty: Number(e.target.value) || 0.001 })}
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          {bIndex === 0 && <Label className="text-[10px] text-slate-500">Max qty</Label>}
+                          <Input
+                            type="number"
+                            min={0}
+                            step="any"
+                            placeholder="and above"
+                            className="h-8 text-xs"
+                            value={b.max_qty ?? ''}
+                            onChange={(e) => updateBreak(bIndex, { max_qty: e.target.value === '' ? null : Number(e.target.value) })}
+                          />
+                        </div>
+                        <div className="space-y-0.5">
+                          {bIndex === 0 && <Label className="text-[10px] text-slate-500">Tier</Label>}
+                          <Select
+                            value={b.price_tier}
+                            onValueChange={(v) => v && updateBreak(bIndex, { price_tier: v as PriceTier })}
+                          >
+                            <SelectTrigger className="h-8 text-xs"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {QTY_PRICE_TIERS.map((t) => (
+                                <SelectItem key={t} value={t}>{PRICE_TIER_LABELS[t]}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-0.5">
+                          {bIndex === 0 && <Label className="text-[10px] text-slate-500">Price</Label>}
+                          <Input
+                            type="number"
+                            min={0}
+                            step="any"
+                            className="h-8 text-xs"
+                            value={b.price}
+                            onChange={(e) => updateBreak(bIndex, { price: Number(e.target.value) || 0 })}
+                          />
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className={cn('h-8 w-8 text-red-400', bIndex === 0 && 'mt-4')}
+                          onClick={() => removeBreak(bIndex)}
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end">
+                <Button type="button" variant="ghost" size="sm" className="text-red-500 h-8 text-xs" onClick={() => removeSaleUnit(index)}>
+                  <Trash2 className="h-3.5 w-3.5 mr-1" /> Remove this unit
+                </Button>
+              </div>
             </div>
-            <div className="space-y-1">
-              <Label className="text-xs">= {baseUnitCode} qty</Label>
-              <Input
-                type="number"
-                min={0.000001}
-                step="any"
-                className="rounded-lg h-10"
-                value={su.conversion_factor}
-                onChange={(e) => updateSaleUnit(index, { conversion_factor: Number(e.target.value) || 1 })}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Retail</Label>
-              <Input
-                type="number"
-                min={0}
-                step="any"
-                className="rounded-lg h-10"
-                value={su.retail_price ?? ''}
-                onChange={(e) => updateSaleUnit(index, { retail_price: Number(e.target.value) || null })}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Wholesale</Label>
-              <Input
-                type="number"
-                min={0}
-                step="any"
-                className="rounded-lg h-10"
-                value={su.wholesale_price ?? ''}
-                onChange={(e) => updateSaleUnit(index, { wholesale_price: Number(e.target.value) || null })}
-              />
-            </div>
-            <div className="space-y-1 sm:col-span-2">
-              <Label className="text-xs">Barcode</Label>
-              <Input
-                className="rounded-lg h-10 font-mono text-xs"
-                placeholder="Optional"
-                value={su.barcode ?? ''}
-                onChange={(e) => updateSaleUnit(index, { barcode: e.target.value.trim() || null })}
-              />
-            </div>
-            <div className="space-y-1">
-              <Label className="text-xs">Default</Label>
-              <Button
-                type="button"
-                variant={su.is_default_sale ? 'default' : 'outline'}
-                size="sm"
-                className="h-10 w-full rounded-lg text-xs"
-                onClick={() => updateSaleUnit(index, { is_default_sale: true })}
-              >
-                {su.is_default_sale ? 'Default' : 'Set default'}
-              </Button>
-            </div>
-            <Button type="button" variant="ghost" size="icon" className="text-red-500" onClick={() => removeSaleUnit(index)}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
@@ -354,6 +485,7 @@ export function defaultProductUnitsState(unitTypes: UnitType[]): ProductUnitsFor
     retail_price: 0,
     wholesale_price: 0,
     distributor_price: 0,
+    vip_price: 0,
     sale_units: [],
   };
 }

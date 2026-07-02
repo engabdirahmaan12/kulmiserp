@@ -13,7 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { BarcodeScannerField } from '@/components/barcode/BarcodeScannerField';
 import { PauseCircle, ShoppingBag, Package } from 'lucide-react';
-import type { Product } from '@/types';
+import type { Product, ProductUnit, QuantityPriceRow } from '@/types';
 import { computeDiscountedPrice } from '@/types';
 import { buildCartItemFromProduct, getEffectivePriceTier, getSaleUnitsForProduct } from '@/lib/pos/units';
 import { ProductAddUnitDialog } from './ProductAddUnitDialog';
@@ -31,7 +31,7 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 
 async function fetchProducts(storeId: string) {
   const supabase = createClient();
-  const [{ data, error }, { data: discountData }] = await Promise.all([
+  const [{ data, error }, { data: discountData }, { data: qtyPriceData }] = await Promise.all([
     supabase
       .from('products')
       .select('*, category:product_categories(name, color), product_units(*, unit_type:unit_types(*))')
@@ -39,6 +39,11 @@ async function fetchProducts(storeId: string) {
       .eq('is_active', true)
       .order('name'),
     supabase.rpc('get_store_active_discounts', { p_store_id: storeId }),
+    supabase
+      .from('product_quantity_prices')
+      .select('id, product_id, unit_type_id, price_tier, min_qty, max_qty, price')
+      .eq('store_id', storeId)
+      .eq('is_active', true),
   ]);
   if (error) throw error;
 
@@ -58,10 +63,24 @@ async function fetchProducts(storeId: string) {
     }
   }
 
+  // Group quantity-break prices by "product_id:unit_type_id" so they can be
+  // attached to the matching product_units row below.
+  const qtyPriceMap = new Map<string, QuantityPriceRow[]>();
+  for (const row of (qtyPriceData ?? []) as Array<QuantityPriceRow & { product_id: string; unit_type_id: string }>) {
+    const key = `${row.product_id}:${row.unit_type_id}`;
+    const list = qtyPriceMap.get(key) ?? [];
+    list.push({ id: row.id, price_tier: row.price_tier, min_qty: row.min_qty, max_qty: row.max_qty, price: row.price });
+    qtyPriceMap.set(key, list);
+  }
+
   return (data ?? []).map((p) => ({
     ...p,
     active_discount: discountMap.get(p.id) ?? null,
     base_unit_code: productBaseUnitCode(p),
+    product_units: (p.product_units ?? []).map((pu: ProductUnit) => ({
+      ...pu,
+      quantity_prices: qtyPriceMap.get(`${p.id}:${pu.unit_type_id}`) ?? [],
+    })),
   })) as (Product & { category: { name: string; color: string } | null; base_unit_code?: string })[];
 }
 

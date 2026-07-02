@@ -2,7 +2,7 @@ import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { CartItem, Customer, PaymentDetail, PaymentMethod, Product } from '@/types';
 import type { PriceTier } from '@/lib/units/conversion';
-import { ensureCartLineKey, recalcCartItem, repriceCartItemForTier } from '@/lib/pos/units';
+import { ensureCartLineKey, recalcCartItem, repriceCartItemForQuantity, repriceCartItemForTier } from '@/lib/pos/units';
 import { refreshCartStockLimits } from '@/lib/pos/stock';
 
 export interface HeldCart {
@@ -44,7 +44,7 @@ interface PosState {
   // Actions
   addItem: (item: CartItem) => boolean;
   removeItem: (lineKey: string) => void;
-  updateQuantity: (lineKey: string, quantity: number) => void;
+  updateQuantity: (lineKey: string, quantity: number, products?: Product[]) => void;
   updateItemDiscount: (lineKey: string, discount: number) => void;
   updateUnitPrice: (lineKey: string, unitPrice: number) => void;
   updateLineItem: (
@@ -152,15 +152,21 @@ export const usePosStore = create<PosState>()(
         set({ items: get().items.filter((i) => i.line_key !== lineKey) });
       },
 
-      updateQuantity: (lineKey, quantity) => {
+      updateQuantity: (lineKey, quantity, products) => {
         if (quantity <= 0) {
           get().removeItem(lineKey);
           return;
         }
+        const productMap = products ? new Map(products.map((p) => [p.id, p])) : null;
         set({
-          items: get().items.map((i) =>
-            i.line_key === lineKey ? recalcCartItem(i, quantity) : i
-          ),
+          items: get().items.map((i) => {
+            if (i.line_key !== lineKey) return i;
+            // Quantity/bulk-break prices re-resolve live as the qty changes;
+            // a manual price override always wins (checked inside the helper).
+            return productMap
+              ? repriceCartItemForQuantity(i, productMap.get(i.product_id), quantity)
+              : recalcCartItem(i, quantity);
+          }),
         });
       },
 

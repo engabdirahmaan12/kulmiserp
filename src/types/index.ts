@@ -96,6 +96,16 @@ export interface UnitType {
   is_active: boolean;
 }
 
+/** A quantity/bulk-break price row for a product's unit at a given tier. */
+export interface QuantityPriceRow {
+  id?: string;
+  price_tier: 'retail' | 'wholesale' | 'distributor' | 'vip';
+  min_qty: number;
+  /** null = "and above" (no upper bound) */
+  max_qty: number | null;
+  price: number;
+}
+
 export interface ProductUnit {
   id: string;
   product_id: string;
@@ -107,6 +117,8 @@ export interface ProductUnit {
   retail_price?: number | null;
   wholesale_price?: number | null;
   distributor_price?: number | null;
+  vip_price?: number | null;
+  quantity_prices?: QuantityPriceRow[];
   unit_type?: UnitType;
 }
 
@@ -125,6 +137,7 @@ export interface Product {
   selling_price: number;
   wholesale_price?: number;
   distributor_price?: number;
+  vip_price?: number;
   tax_rate: number;
   is_taxable: boolean;
   track_inventory: boolean;
@@ -189,7 +202,7 @@ export interface Customer {
   balance: number;
   deposit_balance: number;
   total_purchases: number;
-  price_tier?: 'retail' | 'wholesale' | 'distributor';
+  price_tier?: 'retail' | 'wholesale' | 'distributor' | 'vip';
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -392,7 +405,10 @@ export interface SaleItem {
   sale_unit_qty?: number;
   base_qty?: number;
   returned_base_qty?: number;
-  price_tier?: 'retail' | 'wholesale' | 'distributor';
+  price_tier?: 'retail' | 'wholesale' | 'distributor' | 'vip';
+  original_unit_price?: number | null;
+  price_override_reason?: string | null;
+  price_overridden_by?: string | null;
   product?: Product;
 }
 
@@ -416,7 +432,11 @@ export interface CartItem {
   conversion_factor?: number;
   base_qty?: number;
   allows_decimal?: boolean;
-  price_tier?: 'retail' | 'wholesale' | 'distributor';
+  price_tier?: 'retail' | 'wholesale' | 'distributor' | 'vip';
+  /** Set when a cashier manually overrode the computed price — audit trail. */
+  original_unit_price?: number | null;
+  price_override_reason?: string | null;
+  price_overridden_by?: string | null;
 }
 
 export interface PurchaseOrder {

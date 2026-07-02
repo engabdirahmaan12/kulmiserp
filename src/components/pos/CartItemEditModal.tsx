@@ -11,15 +11,20 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import type { CartItem, Product, ProductUnit } from '@/types';
-import { getEffectiveUnitPrice, isBelowCost } from '@/lib/pos/pricing';
+import { Lock } from 'lucide-react';
+import type { CartItem, Product, ProductUnit, QuantityPriceRow } from '@/types';
+import { getEffectiveUnitPrice, getPosAllowPriceOverride, isBelowCost } from '@/lib/pos/pricing';
 import { buildCartItemFromUnit, getSaleUnitsForProduct } from '@/lib/pos/units';
 import type { PriceTier, ProductSalesMode } from '@/lib/units/conversion';
 import { PRICE_TIER_LABELS, priceTiersForSalesMode, toBaseQty } from '@/lib/units/conversion';
 import { usePosStore } from '@/lib/stores/pos';
+import { useAuthStore } from '@/lib/stores/auth';
+import { usePermission } from '@/lib/hooks/usePermission';
 import { maxQtyInSaleUnit } from '@/lib/pos/stock';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { toSelectItems } from '@/lib/ui/select-utils';
+import { Textarea } from '@/components/ui/textarea';
+import { cn } from '@/lib/utils';
 
 interface CartItemEditModalProps {
   open: boolean;
@@ -42,11 +47,20 @@ export function CartItemEditModal({
 }: CartItemEditModalProps) {
   const { t } = useTranslation();
   const cartItems = usePosStore((s) => s.items);
+  const { currentStore, user } = useAuthStore();
+  const { role } = usePermission();
   const [quantity, setQuantity] = useState('1');
   const [unitPrice, setUnitPrice] = useState('');
   const [discount, setDiscount] = useState('0');
   const [selectedUnitId, setSelectedUnitId] = useState('');
   const [priceTier, setPriceTier] = useState<PriceTier>('retail');
+  const [overrideReason, setOverrideReason] = useState('');
+
+  // Manual price overrides require permission (store setting) + an
+  // owner/manager role — cashiers can't silently retype a price.
+  const canOverridePrice =
+    getPosAllowPriceOverride(currentStore?.settings as Record<string, unknown> | undefined) &&
+    (role === 'owner' || role === 'manager');
 
   const { data: saleUnitsRpc } = useQuery({
     queryKey: ['product-sale-units', item?.product_id],
@@ -67,6 +81,8 @@ export function CartItemEditModal({
           retail_price: number;
           wholesale_price?: number;
           distributor_price?: number;
+          vip_price?: number;
+          quantity_prices?: QuantityPriceRow[];
         }>;
       };
     },
@@ -100,6 +116,8 @@ export function CartItemEditModal({
       retail_price: u.retail_price,
       wholesale_price: u.wholesale_price,
       distributor_price: u.distributor_price,
+      vip_price: u.vip_price,
+      quantity_prices: u.quantity_prices ?? [],
       unit_type: {
         id: u.unit_type_id,
         store_id: '',
@@ -142,6 +160,7 @@ export function CartItemEditModal({
     setDiscount(String(item.discount_amount || 0));
     setSelectedUnitId(item.sale_unit_id ?? saleUnits[0]?.unit_type_id ?? '');
     setPriceTier((item.price_tier as PriceTier) ?? 'retail');
+    setOverrideReason(item.price_override_reason ?? '');
   }, [item, saleUnits]);
 
   useEffect(() => {
@@ -162,6 +181,19 @@ export function CartItemEditModal({
     if (!product || !selectedUnit || !item) return undefined;
     return maxQtyInSaleUnit(product, selectedUnit, cartItems, item.line_key);
   }, [product, selectedUnit, cartItems, item?.line_key]);
+
+  // The price the system would compute for the current unit/tier/quantity
+  // (including any quantity/bulk-break price) — used to detect a manual
+  // override, independent of what the cashier has typed into the field.
+  const expectedPrice = useMemo(() => {
+    if (!product || !selectedUnit || !item) return null;
+    const qty = allowsDecimal ? Math.max(0.001, parseFloat(quantity) || 0) : Math.max(1, parseInt(quantity, 10) || 1);
+    const rebuilt = buildCartItemFromUnit(product, selectedUnit, priceTier, qty, 0, cartItems, item.line_key);
+    return rebuilt?.unit_price ?? null;
+  }, [product, selectedUnit, priceTier, quantity, allowsDecimal, cartItems, item]);
+
+  const typedPrice = parseFloat(unitPrice) || 0;
+  const isOverridingPrice = expectedPrice != null && Math.abs(typedPrice - expectedPrice) > 0.0001;
 
   if (!item) return null;
 
@@ -203,7 +235,30 @@ export function CartItemEditModal({
       return;
     }
 
-    next = { ...next, unit_price: price, discount_amount: disc };
+    // The computed price before any manual override — includes tier +
+    // quantity/bulk-break pricing for the quantity actually being saved.
+    const tierComputedPrice = next.unit_price;
+    const overriding = Math.abs(price - tierComputedPrice) > 0.0001;
+
+    if (overriding) {
+      if (!canOverridePrice) {
+        toast.error('You don\'t have permission to change this price. Ask an owner or manager.');
+        return;
+      }
+      if (!overrideReason.trim()) {
+        toast.error('Enter a reason for changing the price.');
+        return;
+      }
+    }
+
+    next = {
+      ...next,
+      unit_price: price,
+      discount_amount: disc,
+      original_unit_price: overriding ? tierComputedPrice : null,
+      price_override_reason: overriding ? overrideReason.trim() : null,
+      price_overridden_by: overriding ? (user?.id ?? null) : null,
+    };
     next = {
       ...next,
       subtotal: qty * price - disc + (qty * price - disc) * (next.tax_rate / 100),
@@ -299,16 +354,42 @@ export function CartItemEditModal({
               />
             </div>
             <div className="space-y-1.5 col-span-2">
-              <Label>{t('pos.salePrice', { currency })}</Label>
+              <Label className="flex items-center gap-1.5">
+                {t('pos.salePrice', { currency })}
+                {!canOverridePrice && <Lock className="h-3 w-3 text-slate-400" />}
+              </Label>
               <Input
                 type="number"
                 min={0}
                 step="0.01"
                 value={unitPrice}
                 onChange={(e) => setUnitPrice(e.target.value)}
+                disabled={!canOverridePrice}
+                className={cn(isOverridingPrice && canOverridePrice && 'border-amber-400 ring-1 ring-amber-200')}
               />
             </div>
           </div>
+
+          {isOverridingPrice && canOverridePrice && (
+            <div className="space-y-1.5 rounded-lg border border-amber-200 bg-amber-50 p-3">
+              <p className="text-xs font-medium text-amber-800">
+                Price overridden — system price is {currency} {fmt(expectedPrice ?? 0)}
+              </p>
+              <Label className="text-xs text-amber-800">Reason for this price change</Label>
+              <Textarea
+                value={overrideReason}
+                onChange={(e) => setOverrideReason(e.target.value)}
+                placeholder="e.g. Regular customer, damaged packaging, price match…"
+                className="min-h-[56px] resize-none bg-white text-sm"
+              />
+            </div>
+          )}
+
+          {!canOverridePrice && (
+            <p className="text-xs text-slate-400">
+              Only owners/managers can change this price. Ask them, or enable it in Settings.
+            </p>
+          )}
 
           {basePreview !== null && selectedUnit && (
             <p className="text-xs text-emerald-700">

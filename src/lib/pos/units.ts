@@ -10,7 +10,25 @@ import {
   resolveTierPrice,
   toBaseQty,
 } from '@/lib/units/conversion';
+import { resolveQuantityPrice } from '@/lib/units/quantityPricing';
 import { maxQtyInSaleUnit } from '@/lib/pos/stock';
+
+/** Tier price, then quantity/bulk-break override if a breakpoint matches. */
+function priceForUnitAndQty(unit: ProductUnit, product: Product, tier: PriceTier, qty: number): number {
+  const tierPrice = resolveTierPrice(
+    unit,
+    tier,
+    {
+      retail: product.selling_price,
+      wholesale: product.wholesale_price,
+      distributor: product.distributor_price,
+      vip: product.vip_price,
+    },
+    unit.conversion_factor ?? 1,
+  );
+  const qtyPrice = resolveQuantityPrice(unit.quantity_prices, tier, qty);
+  return qtyPrice ?? tierPrice;
+}
 
 export function cartLineKey(productId: string, saleUnitId?: string): string {
   return `${productId}:${saleUnitId ?? 'base'}`;
@@ -66,17 +84,9 @@ export function saleUnitPriceForProduct(
   product: Product,
   unit: ProductUnit,
   tier: PriceTier,
+  quantity = 1,
 ): number {
-  return resolveTierPrice(
-    unit,
-    tier,
-    {
-      retail: product.selling_price,
-      wholesale: product.wholesale_price,
-      distributor: product.distributor_price,
-    },
-    unit.conversion_factor ?? 1,
-  );
+  return priceForUnitAndQty(unit, product, tier, quantity);
 }
 
 export function defaultSalePriceForProduct(product: Product, tier: PriceTier = 'retail'): number {
@@ -100,16 +110,7 @@ export function buildCartItemFromProduct(
   const unitTypeId = unit.unit_type_id;
   const unitCode = unit.unit_type?.code;
 
-  const unitPrice = resolveTierPrice(
-    unit,
-    tier,
-    {
-      retail: product.selling_price,
-      wholesale: product.wholesale_price,
-      distributor: product.distributor_price,
-    },
-    conversion,
-  );
+  const unitPrice = priceForUnitAndQty(unit, product, tier, quantity);
 
   const maxInUnit = maxQtyInSaleUnit(product, unit, cartItems, excludeLineKey);
 
@@ -156,16 +157,7 @@ export function buildCartItemFromUnit(
 ): CartItem | null {
   const conversion = unit.conversion_factor ?? 1;
   const allowsDecimal = unit.unit_type?.allows_decimal ?? false;
-  const unitPrice = resolveTierPrice(
-    unit,
-    tier,
-    {
-      retail: product.selling_price,
-      wholesale: product.wholesale_price,
-      distributor: product.distributor_price,
-    },
-    conversion,
-  );
+  const unitPrice = priceForUnitAndQty(unit, product, tier, quantity);
 
   const maxInUnit = maxQtyInSaleUnit(product, unit, cartItems, excludeLineKey);
 
@@ -206,22 +198,35 @@ export function repriceCartItemForTier(item: CartItem, product: Product, tier: P
   const unit = units.find((u) => u.unit_type_id === item.sale_unit_id) ?? pickDefaultSaleUnit(product);
   if (!unit) return { ...item, price_tier: tier };
 
-  const conversion = unit.conversion_factor ?? item.conversion_factor ?? 1;
-  const unitPrice = resolveTierPrice(
-    unit,
-    tier,
-    {
-      retail: product.selling_price,
-      wholesale: product.wholesale_price,
-      distributor: product.distributor_price,
-    },
-    conversion,
-  );
+  const unitPrice = priceForUnitAndQty(unit, product, tier, item.quantity);
 
   return recalcCartItem(
     { ...item, unit_price: unitPrice, price_tier: tier, discount_amount: item.discount_amount },
     item.quantity,
   );
+}
+
+/**
+ * Re-resolves a cart line's price when its quantity changes, so a
+ * quantity/bulk-break price kicks in automatically as the cashier types a
+ * new quantity into the main cart (not just the edit modal). A manual price
+ * override always wins — never silently overwritten by a quantity change.
+ */
+export function repriceCartItemForQuantity(
+  item: CartItem,
+  product: Product | undefined,
+  quantity: number,
+): CartItem {
+  if (item.original_unit_price != null || !product) {
+    return recalcCartItem(item, quantity);
+  }
+  const units = getSaleUnitsForProduct(product);
+  const unit = units.find((u) => u.unit_type_id === item.sale_unit_id) ?? pickDefaultSaleUnit(product);
+  if (!unit) return recalcCartItem(item, quantity);
+
+  const tier = (item.price_tier as PriceTier) ?? 'retail';
+  const unitPrice = priceForUnitAndQty(unit, product, tier, quantity);
+  return recalcCartItem({ ...item, unit_price: unitPrice }, quantity);
 }
 
 export function recalcCartItem(item: CartItem, quantity: number): CartItem {
@@ -257,5 +262,8 @@ export function toSaleRpcItem(item: CartItem) {
     discount_amount: item.discount_amount,
     tax_amount: item.tax_amount * saleQty,
     subtotal: item.unit_price * saleQty - item.discount_amount,
+    original_unit_price: item.original_unit_price ?? null,
+    price_override_reason: item.price_override_reason ?? null,
+    price_overridden_by: item.price_overridden_by ?? null,
   };
 }

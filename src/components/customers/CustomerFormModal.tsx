@@ -27,7 +27,7 @@ const schema = z.object({
   address: z.string().optional(),
   notes: z.string().optional(),
   credit_limit: z.number().min(0).default(0),
-  price_tier: z.enum(['retail', 'wholesale', 'distributor']).default('retail'),
+  price_tier: z.enum(['retail', 'wholesale', 'distributor', 'vip']).default('retail'),
 });
 
 type FormData = z.infer<typeof schema>;

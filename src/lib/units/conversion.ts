@@ -1,6 +1,17 @@
+/** @deprecated Business Mode selection was removed — pricing is now per-product/per-customer via price tiers. Left for backward-compat data only. */
 export type BusinessMode = 'retail_only' | 'wholesale_only' | 'wholesale_retail';
-export type PriceTier = 'retail' | 'wholesale' | 'distributor';
+export type PriceTier = 'retail' | 'wholesale' | 'distributor' | 'vip';
 export type ProductSalesMode = 'retail' | 'wholesale' | 'both';
+
+/** A quantity/bulk-break price row for a product's unit at a given tier. */
+export interface QuantityPriceRow {
+  id?: string;
+  price_tier: PriceTier;
+  min_qty: number;
+  /** null = "and above" (no upper bound) */
+  max_qty: number | null;
+  price: number;
+}
 
 export interface UnitType {
   id: string;
@@ -26,6 +37,8 @@ export interface ProductUnitOption {
   retail_price?: number | null;
   wholesale_price?: number | null;
   distributor_price?: number | null;
+  vip_price?: number | null;
+  quantity_prices?: QuantityPriceRow[];
 }
 
 /** Base units received/stocked per 1 of the given unit */
@@ -67,19 +80,21 @@ function isLegacyBasePriceOnBulkUnit(
  * product_units prices, when set, are per that sale unit; when null, derive base × conversion.
  */
 export function resolveTierPrice(
-  unit: Pick<ProductUnitOption, 'retail_price' | 'wholesale_price' | 'distributor_price'>,
+  unit: Pick<ProductUnitOption, 'retail_price' | 'wholesale_price' | 'distributor_price' | 'vip_price'>,
   tier: PriceTier,
-  fallbacks?: { retail?: number; wholesale?: number; distributor?: number },
+  fallbacks?: { retail?: number; wholesale?: number; distributor?: number; vip?: number },
   conversionFactor = 1,
 ): number {
   const factor = Number(conversionFactor) || 1;
   const baseRetail = Number(fallbacks?.retail ?? 0);
   const baseWholesale = Number(fallbacks?.wholesale ?? baseRetail);
   const baseDistributor = Number(fallbacks?.distributor ?? baseWholesale);
+  const baseVip = Number(fallbacks?.vip ?? baseRetail);
 
   const derivedRetail = baseRetail * factor;
   const derivedWholesale = baseWholesale * factor;
   const derivedDistributor = baseDistributor * factor;
+  const derivedVip = baseVip * factor;
 
   const retail =
     unit.retail_price != null && !isLegacyBasePriceOnBulkUnit(unit.retail_price, baseRetail, factor)
@@ -93,9 +108,14 @@ export function resolveTierPrice(
     unit.distributor_price != null && !isLegacyBasePriceOnBulkUnit(unit.distributor_price, baseDistributor, factor)
       ? unit.distributor_price
       : derivedDistributor;
+  const vip =
+    unit.vip_price != null && !isLegacyBasePriceOnBulkUnit(unit.vip_price, baseVip, factor)
+      ? unit.vip_price
+      : derivedVip;
 
   if (tier === 'wholesale') return wholesale;
   if (tier === 'distributor') return distributor;
+  if (tier === 'vip') return vip;
   return retail;
 }
 
@@ -120,6 +140,7 @@ export const BUSINESS_MODE_LABELS: Record<BusinessMode, string> = {
 export const PRICE_TIER_LABELS: Record<PriceTier, string> = {
   retail: 'Retail',
   wholesale: 'Wholesale',
+  vip: 'VIP',
   distributor: 'Distributor',
 };
 
@@ -129,11 +150,13 @@ export const PRODUCT_SALES_MODE_LABELS: Record<ProductSalesMode, string> = {
   both: 'Wholesale + Retail',
 };
 
-/** Price tiers allowed for a product based on its sales mode. */
+/** Price tiers allowed for a product based on its sales mode. VIP is a
+ *  customer-assigned tier independent of sales mode, so it's always
+ *  available; Distributor stays gated to wholesale-capable modes. */
 export function priceTiersForSalesMode(mode: ProductSalesMode | undefined): PriceTier[] {
-  if (mode === 'retail') return ['retail'];
-  if (mode === 'wholesale') return ['wholesale', 'distributor'];
-  return ['retail', 'wholesale', 'distributor'];
+  if (mode === 'retail') return ['retail', 'vip'];
+  if (mode === 'wholesale') return ['wholesale', 'distributor', 'vip'];
+  return ['retail', 'wholesale', 'distributor', 'vip'];
 }
 
 export function defaultTierForSalesMode(mode: ProductSalesMode | undefined): PriceTier {

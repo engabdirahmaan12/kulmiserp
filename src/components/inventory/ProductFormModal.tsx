@@ -28,7 +28,7 @@ import { uploadProductImage } from '@/lib/storage/upload';
 import { toSelectItems } from '@/lib/ui/select-utils';
 import { toBaseUnitCost } from '@/lib/units/conversion';
 import { PRODUCT_SALES_MODE_LABELS, type ProductSalesMode } from '@/lib/units/conversion';
-import type { ProductUnit, UnitType } from '@/types';
+import type { ProductUnit, QuantityPriceRow, UnitType } from '@/types';
 import { Switch } from '@/components/ui/switch';
 
 /** Stable fallback — avoid `= []` in useQuery destructuring (new ref every render). */
@@ -118,6 +118,7 @@ function buildUnitsFormFromProduct(
     retail_price: product.selling_price ?? 0,
     wholesale_price: product.wholesale_price ?? 0,
     distributor_price: product.distributor_price ?? 0,
+    vip_price: product.vip_price ?? 0,
     sale_units: saleExtras.map((u) => ({
       unit_type_id: u.unit_type_id,
       conversion_factor: u.conversion_factor,
@@ -127,6 +128,8 @@ function buildUnitsFormFromProduct(
       retail_price: u.retail_price,
       wholesale_price: u.wholesale_price,
       distributor_price: u.distributor_price,
+      vip_price: u.vip_price,
+      quantity_prices: u.quantity_prices ?? [],
     })),
   };
 }
@@ -287,12 +290,30 @@ export function ProductFormModal({ open, product, onClose }: ProductFormModalPro
     queryKey: ['product-units', product?.id],
     queryFn: async () => {
       const supabase = createClient();
-      const { data, error } = await supabase
-        .from('product_units')
-        .select('*, unit_type:unit_types(*)')
-        .eq('product_id', product!.id);
+      const [{ data, error }, { data: qtyPriceData }] = await Promise.all([
+        supabase
+          .from('product_units')
+          .select('*, unit_type:unit_types(*)')
+          .eq('product_id', product!.id),
+        supabase
+          .from('product_quantity_prices')
+          .select('id, unit_type_id, price_tier, min_qty, max_qty, price')
+          .eq('product_id', product!.id)
+          .eq('is_active', true),
+      ]);
       if (error) throw error;
-      return (data ?? []) as ProductUnit[];
+
+      const qtyByUnit = new Map<string, QuantityPriceRow[]>();
+      for (const row of (qtyPriceData ?? []) as Array<QuantityPriceRow & { unit_type_id: string }>) {
+        const list = qtyByUnit.get(row.unit_type_id) ?? [];
+        list.push({ id: row.id, price_tier: row.price_tier, min_qty: row.min_qty, max_qty: row.max_qty, price: row.price });
+        qtyByUnit.set(row.unit_type_id, list);
+      }
+
+      return (data ?? []).map((u) => ({
+        ...u,
+        quantity_prices: qtyByUnit.get(u.unit_type_id) ?? [],
+      })) as ProductUnit[];
     },
     enabled: !!product?.id && open,
   });
@@ -419,6 +440,7 @@ export function ProductFormModal({ open, product, onClose }: ProductFormModalPro
         selling_price: unitsForm.retail_price,
         wholesale_price: unitsForm.wholesale_price || null,
         distributor_price: unitsForm.distributor_price || null,
+        vip_price: unitsForm.vip_price || null,
         is_taxable: data.is_taxable,
         tax_rate: data.is_taxable ? data.tax_rate : 0,
         track_inventory: data.track_inventory,
@@ -495,6 +517,7 @@ export function ProductFormModal({ open, product, onClose }: ProductFormModalPro
           retail_price: purchaseSale?.retail_price ?? (purchaseUnitId === unitsForm.base_unit_id ? unitsForm.retail_price : null),
           wholesale_price: (purchaseSale?.wholesale_price ?? (purchaseUnitId === unitsForm.base_unit_id ? unitsForm.wholesale_price : null)) || null,
           distributor_price: (purchaseSale?.distributor_price ?? (purchaseUnitId === unitsForm.base_unit_id ? unitsForm.distributor_price : null)) || null,
+          vip_price: (purchaseSale?.vip_price ?? (purchaseUnitId === unitsForm.base_unit_id ? unitsForm.vip_price : null)) || null,
         });
 
         if (purchaseUnitId !== unitsForm.base_unit_id) {
@@ -509,6 +532,7 @@ export function ProductFormModal({ open, product, onClose }: ProductFormModalPro
             retail_price: baseSale?.retail_price ?? unitsForm.retail_price,
             wholesale_price: (baseSale?.wholesale_price ?? unitsForm.wholesale_price) || null,
             distributor_price: (baseSale?.distributor_price ?? unitsForm.distributor_price) || null,
+            vip_price: (baseSale?.vip_price ?? unitsForm.vip_price) || null,
           });
         }
 
@@ -525,6 +549,7 @@ export function ProductFormModal({ open, product, onClose }: ProductFormModalPro
             retail_price: su.retail_price,
             wholesale_price: su.wholesale_price,
             distributor_price: su.distributor_price,
+            vip_price: su.vip_price,
           });
         }
 
@@ -538,6 +563,26 @@ export function ProductFormModal({ open, product, onClose }: ProductFormModalPro
 
         const { error: unitsError } = await supabase.from('product_units').insert(dedupedRows);
         if (unitsError) throw unitsError;
+
+        // Quantity/bulk-break prices are only editable on the sale-unit rows.
+        await supabase.from('product_quantity_prices').delete().eq('product_id', productId);
+        const qtyRows = unitsForm.sale_units.flatMap((su) =>
+          su.unit_type_id
+            ? (su.quantity_prices ?? []).map((qp) => ({
+                store_id: currentStore.id,
+                product_id: productId,
+                unit_type_id: su.unit_type_id,
+                price_tier: qp.price_tier,
+                min_qty: qp.min_qty,
+                max_qty: qp.max_qty,
+                price: qp.price,
+              }))
+            : [],
+        );
+        if (qtyRows.length > 0) {
+          const { error: qtyError } = await supabase.from('product_quantity_prices').insert(qtyRows);
+          if (qtyError) throw qtyError;
+        }
       }
     },
     onSuccess: () => {

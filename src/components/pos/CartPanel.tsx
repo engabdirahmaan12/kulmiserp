@@ -96,10 +96,10 @@ export function CartPanel({ products = [] }: { products?: Product[] }) {
     }
     if (item.track_inventory && item.max_stock !== undefined && qty > item.max_stock) {
       toast.error(t('pos.onlyInStock', { count: item.max_stock }));
-      updateQuantity(item.line_key, item.max_stock);
+      updateQuantity(item.line_key, item.max_stock, products);
       return;
     }
-    updateQuantity(item.line_key, qty);
+    updateQuantity(item.line_key, qty, products);
   };
 
   const handleCheckout = () => {
@@ -213,7 +213,7 @@ export function CartPanel({ products = [] }: { products?: Product[] }) {
                 <div className="flex items-center gap-1 shrink-0">
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); updateQuantity(item.line_key, item.quantity - 1); }}
+                    onClick={(e) => { e.stopPropagation(); updateQuantity(item.line_key, item.quantity - 1, products); }}
                     className="flex h-6 w-6 items-center justify-center rounded border border-slate-200 bg-white text-slate-600 hover:bg-blue-50 hover:border-blue-300 transition-colors"
                   >
                     <Minus className="h-3 w-3" />
@@ -229,7 +229,7 @@ export function CartPanel({ products = [] }: { products?: Product[] }) {
                   />
                   <button
                     type="button"
-                    onClick={(e) => { e.stopPropagation(); updateQuantity(item.line_key, item.quantity + 1); }}
+                    onClick={(e) => { e.stopPropagation(); updateQuantity(item.line_key, item.quantity + 1, products); }}
                     disabled={item.track_inventory && item.max_stock !== undefined && item.quantity >= item.max_stock}
                     className="flex h-6 w-6 items-center justify-center rounded border border-slate-200 bg-white text-slate-600 hover:bg-blue-50 hover:border-blue-300 disabled:opacity-40 transition-colors"
                   >

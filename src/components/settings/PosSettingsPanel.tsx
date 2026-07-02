@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { DataPanel } from '@/components/layout/PageShell';
 import { btnPrimary, inputSoft } from '@/lib/ui-classes';
 import { cn } from '@/lib/utils';
-import { getPosAllowBelowCost } from '@/lib/pos/pricing';
+import { getPosAllowBelowCost, getPosAllowPriceOverride } from '@/lib/pos/pricing';
 
 export function PosSettingsPanel() {
   const { currentStore, user } = useAuthStore();
@@ -21,6 +21,7 @@ export function PosSettingsPanel() {
   const settings = (currentStore?.settings ?? {}) as Record<string, unknown>;
 
   const [allowBelowCost, setAllowBelowCost] = useState(getPosAllowBelowCost(settings));
+  const [allowPriceOverride, setAllowPriceOverride] = useState(getPosAllowPriceOverride(settings));
   const [purchasePrefix, setPurchasePrefix] = useState(currentStore?.purchase_prefix ?? 'PUR');
 
   const { mutate: save, isPending } = useMutation({
@@ -29,7 +30,10 @@ export function PosSettingsPanel() {
       const { error: settingsError } = await supabase.rpc('update_store_invoice_settings', {
         p_store_id: currentStore!.id,
         p_user_id: user!.id,
-        p_settings: { pos_allow_below_cost_sales: allowBelowCost },
+        p_settings: {
+          pos_allow_below_cost_sales: allowBelowCost,
+          pos_allow_price_override: allowPriceOverride,
+        },
       });
       if (settingsError) throw settingsError;
 
@@ -61,6 +65,17 @@ export function PosSettingsPanel() {
           </p>
         </div>
         <Switch checked={allowBelowCost} onCheckedChange={setAllowBelowCost} />
+      </div>
+
+      <div className="flex items-center justify-between rounded-xl border border-violet-200 bg-violet-50/40 p-4">
+        <div>
+          <Label className="text-sm font-medium text-violet-900">Allow price override at checkout</Label>
+          <p className="text-xs text-violet-700/80 mt-1">
+            Lets owners/managers retype a line's price at POS with a required reason —
+            every override is saved (original price, new price, reason, who did it).
+          </p>
+        </div>
+        <Switch checked={allowPriceOverride} onCheckedChange={setAllowPriceOverride} />
       </div>
 
       <div className="space-y-1.5 max-w-xs">

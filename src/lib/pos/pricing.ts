@@ -21,6 +21,13 @@ export function getPosAllowBelowCost(settings: Record<string, unknown> | undefin
   return settings?.pos_allow_below_cost_sales === true;
 }
 
+/** Whether cashiers may override a computed price at POS. Combined with a
+ *  role check (owner/manager) at the call site — this setting alone doesn't
+ *  grant the permission. */
+export function getPosAllowPriceOverride(settings: Record<string, unknown> | undefined): boolean {
+  return settings?.pos_allow_price_override === true;
+}
+
 export function recalcLineSubtotal(
   quantity: number,
   unitPrice: number,
