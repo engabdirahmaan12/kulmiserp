@@ -73,6 +73,25 @@ export const PM_COLORS: Record<string, string> = {
   CARD:  PALETTE.teal,
 };
 
+/** Expense category → color, mirroring PM_COLORS. Falls back to cycling
+ *  through CHART_COLORS for any category not listed here (e.g. custom ones). */
+export const EXPENSE_COLORS: Record<string, string> = {
+  Rent:        PALETTE.rose,
+  Utilities:   PALETTE.amber,
+  Salaries:    PALETTE.blue,
+  Marketing:   PALETTE.pink,
+  Supplies:    PALETTE.teal,
+  Transport:   PALETTE.orange,
+  Insurance:   PALETTE.indigo,
+  Maintenance: PALETTE.sky,
+  Food:        PALETTE.emerald,
+  Other:       PALETTE.violet,
+};
+
+export function expenseCategoryColor(category: string, index: number): string {
+  return EXPENSE_COLORS[category] ?? CHART_COLORS[index % CHART_COLORS.length];
+}
+
 // ─── Gradient Defs ───────────────────────────────────────────────────────────
 export function GradientDefs() {
   return (

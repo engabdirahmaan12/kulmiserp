@@ -15,7 +15,7 @@ import { BarcodeScannerField } from '@/components/barcode/BarcodeScannerField';
 import { PauseCircle, ShoppingBag, Package } from 'lucide-react';
 import type { Product, ProductUnit, QuantityPriceRow } from '@/types';
 import { computeDiscountedPrice } from '@/types';
-import { buildCartItemFromProduct, getEffectivePriceTier, getSaleUnitsForProduct } from '@/lib/pos/units';
+import { buildCartItemFromProduct, getSaleUnitsForProduct } from '@/lib/pos/units';
 import { ProductAddUnitDialog } from './ProductAddUnitDialog';
 import { productBaseUnitCode } from '@/lib/units/conversion';
 import { toast } from 'sonner';
@@ -109,7 +109,7 @@ export default function PosSystem() {
   const {
     items,
     addItem,
-    customer,
+    cart_tier,
     isCheckoutOpen,
     setCheckoutOpen,
     offline_queue,
@@ -180,18 +180,16 @@ export default function PosSystem() {
       return;
     }
 
-    const tier = getEffectivePriceTier(
-      product,
-      customer,
-      (currentStore?.settings ?? {}) as Record<string, unknown>,
-    );
-    const cartItem = buildCartItemFromProduct(product, tier, pickedUnit ?? undefined, items);
+    // The cashier's cart-level Retail/Wholesale choice drives new-line pricing.
+    // resolveTierPrice falls back to retail when a wholesale price is absent, so
+    // this is always safe regardless of the product's own price setup.
+    const cartItem = buildCartItemFromProduct(product, cart_tier, pickedUnit ?? undefined, items);
     if (!cartItem) {
       toast.error(t('pos.outOfStockToast', { name: product.name }));
       return;
     }
     commitAddToCart(cartItem, product);
-  }, [commitAddToCart, customer, currentStore?.settings, items, t]);
+  }, [commitAddToCart, cart_tier, items, t]);
 
   const handleAddProduct = useCallback((product: Product) => {
     handleAddProductWithUnit(product);
@@ -420,11 +418,7 @@ export default function PosSystem() {
       <ProductAddUnitDialog
         open={!!addUnitProduct}
         product={addUnitProduct}
-        tier={getEffectivePriceTier(
-          addUnitProduct,
-          customer,
-          (currentStore?.settings ?? {}) as Record<string, unknown>,
-        )}
+        tier={cart_tier}
         cartItems={items}
         currency={currentStore?.currency ?? 'USD'}
         onClose={() => setAddUnitProduct(null)}

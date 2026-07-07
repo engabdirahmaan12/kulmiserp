@@ -9,22 +9,38 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
   BarChart3,
+  Boxes,
   DollarSign,
+  History,
+  LayoutDashboard,
   Package,
   Percent,
   Receipt,
   Search,
   ShoppingCart,
   Tag,
+  Truck,
+  Wallet,
 } from 'lucide-react';
 import { format, subDays, startOfMonth } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PageShell } from '@/components/layout/PageShell';
 import { cn } from '@/lib/utils';
 import { inputSoft } from '@/lib/ui-classes';
-import { PALETTE } from '@/lib/chart-utils';
+import { PALETTE, expenseCategoryColor } from '@/lib/chart-utils';
 import { PRICE_TIER_LABELS } from '@/lib/units/conversion';
 import type { ReportsChartsPanelProps } from '@/components/reports/ReportsChartsPanel';
+import { StockValueTab } from '@/components/reports/StockValueTab';
+import { PurchasesTab } from '@/components/reports/PurchasesTab';
+import { PaymentAccountsTab } from '@/components/reports/PaymentAccountsTab';
+import {
+  SalesInsights,
+  ProductsInsights,
+  PricingInsights,
+  PriceHistoryInsights,
+  ExpensesInsights,
+  TabExportButton,
+} from '@/components/reports/TabInsights';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   ReportPageHeader,
@@ -92,20 +108,48 @@ export default function ReportsPage() {
     enabled: !!currentStore,
   });
 
-  const { data: periodExpenses = 0 } = useQuery({
+  const { data: expenseRows = [] } = useQuery({
     queryKey: ['report-expenses', currentStore?.id, dateFrom, dateTo],
     queryFn: async () => {
       const supabase = createClient();
       const { data } = await supabase
         .from('expenses')
-        .select('amount')
+        .select('amount, category, expense_date')
         .eq('store_id', currentStore!.id)
         .gte('expense_date', dateFrom)
         .lte('expense_date', dateTo);
-      return (data ?? []).reduce((s, e) => s + (e.amount || 0), 0);
+      return (data ?? []) as { amount: number; category: string | null; expense_date: string }[];
     },
     enabled: !!currentStore,
   });
+
+  const periodExpenses = useMemo(
+    () => expenseRows.reduce((s, e) => s + (e.amount || 0), 0),
+    [expenseRows],
+  );
+
+  const expensesByCategory = useMemo(() => {
+    const map = new Map<string, { total: number; count: number }>();
+    for (const e of expenseRows) {
+      const key = e.category?.trim() || 'Other';
+      const cur = map.get(key) ?? { total: 0, count: 0 };
+      map.set(key, { total: cur.total + (e.amount || 0), count: cur.count + 1 });
+    }
+    return Array.from(map.entries())
+      .map(([category, v]) => ({ category, ...v }))
+      .sort((a, b) => b.total - a.total);
+  }, [expenseRows]);
+
+  const expensesTrend = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const e of expenseRows) {
+      const day = e.expense_date;
+      map.set(day, (map.get(day) ?? 0) + (e.amount || 0));
+    }
+    return Array.from(map.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([date, total]) => ({ date: format(new Date(date), 'MMM d'), total }));
+  }, [expenseRows]);
 
   const { data: productReport } = useQuery({
     queryKey: ['product-report', currentStore?.id, dateFrom, dateTo],
@@ -164,6 +208,80 @@ export default function ReportsPage() {
         .lte('sale.sale_date', dateTo + 'T23:59:59');
       if (error) throw error;
       return data ?? [];
+    },
+    enabled: !!currentStore,
+  });
+
+  interface PriceHistoryRow {
+    id: string;
+    product: string;
+    type: 'Cost' | 'Retail' | 'Wholesale' | 'VIP' | 'Distributor';
+    oldPrice: number;
+    newPrice: number;
+    date: string;
+    source: string;
+  }
+
+  const { data: priceHistory = [] } = useQuery({
+    queryKey: ['price-history', currentStore?.id, dateFrom, dateTo],
+    queryFn: async (): Promise<PriceHistoryRow[]> => {
+      const supabase = createClient();
+      const [costRes, sellRes] = await Promise.all([
+        supabase
+          .from('product_cost_history')
+          .select('id, previous_average_cost, new_average_cost, created_at, supplier:suppliers(name), product:products(name)')
+          .eq('store_id', currentStore!.id)
+          .gte('created_at', dateFrom)
+          .lte('created_at', dateTo + 'T23:59:59')
+          .order('created_at', { ascending: false })
+          .limit(200),
+        supabase
+          .from('product_selling_price_history')
+          .select('id, price_type, old_price, new_price, created_at, product:products(name)')
+          .eq('store_id', currentStore!.id)
+          .gte('created_at', dateFrom)
+          .lte('created_at', dateTo + 'T23:59:59')
+          .order('created_at', { ascending: false })
+          .limit(200),
+      ]);
+
+      const priceTypeLabel: Record<string, PriceHistoryRow['type']> = {
+        retail: 'Retail',
+        wholesale: 'Wholesale',
+        vip: 'VIP',
+        distributor: 'Distributor',
+      };
+
+      const costRows: PriceHistoryRow[] = (costRes.data ?? []).map((r) => {
+        const supplier = r.supplier as unknown as { name?: string } | null;
+        const product = r.product as unknown as { name?: string } | null;
+        return {
+          id: r.id,
+          product: product?.name ?? 'Unknown',
+          type: 'Cost',
+          oldPrice: Number(r.previous_average_cost) || 0,
+          newPrice: Number(r.new_average_cost) || 0,
+          date: r.created_at,
+          source: supplier?.name ? `Purchase (${supplier.name})` : 'Purchase',
+        };
+      });
+
+      const sellRows: PriceHistoryRow[] = (sellRes.data ?? []).map((r) => {
+        const product = r.product as unknown as { name?: string } | null;
+        return {
+          id: r.id,
+          product: product?.name ?? 'Unknown',
+          type: priceTypeLabel[r.price_type] ?? 'Retail',
+          oldPrice: Number(r.old_price) || 0,
+          newPrice: Number(r.new_price) || 0,
+          date: r.created_at,
+          source: 'Manual edit',
+        };
+      });
+
+      return [...costRows, ...sellRows].sort(
+        (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
+      );
     },
     enabled: !!currentStore,
   });
@@ -393,6 +511,69 @@ export default function ReportsPage() {
   const exportProductsCsv = () => downloadCsv(buildProductsCsv(), `products-${dateFrom}-to-${dateTo}.csv`);
   const exportLineItemsCsv = () => downloadCsv(buildLineItemsCsv(), `line-items-${dateFrom}-to-${dateTo}.csv`);
 
+  const buildPriceHistoryCsv = () => {
+    if (!priceHistory.length) return '';
+    const rows = priceHistory.map((r) => [
+      r.product,
+      r.type,
+      r.oldPrice.toFixed(2),
+      r.newPrice.toFixed(2),
+      (r.newPrice - r.oldPrice).toFixed(2),
+      format(new Date(r.date), 'yyyy-MM-dd'),
+      r.source,
+    ]);
+    return [
+      ['Product', 'Type', 'Old Price', 'New Price', 'Change', 'Date', 'Source'],
+      ...rows,
+    ].map((r) => r.join(',')).join('\n');
+  };
+  const exportPriceHistoryCsv = () => downloadCsv(buildPriceHistoryCsv(), `price-history-${dateFrom}-to-${dateTo}.csv`);
+
+  const buildPricingCsv = () => {
+    const tiers = ['retail', 'wholesale', 'vip', 'distributor'] as const;
+    const rows = tiers.map((tier) => {
+      const b = tierBreakdown[tier];
+      const share = totals && totals.revenue > 0 ? ((b.revenue / totals.revenue) * 100).toFixed(1) + '%' : '0.0%';
+      return [PRICE_TIER_LABELS[tier], b.count, b.qty, b.revenue.toFixed(2), share];
+    });
+    const c = tierBreakdown.custom;
+    rows.push([
+      'Custom Price (overridden)',
+      c.count,
+      c.qty,
+      c.revenue.toFixed(2),
+      totals && totals.revenue > 0 ? ((c.revenue / totals.revenue) * 100).toFixed(1) + '%' : '0.0%',
+    ]);
+    return [['Price Level', 'Lines', 'Qty Sold', 'Revenue', 'Share'], ...rows]
+      .map((r) => r.join(','))
+      .join('\n');
+  };
+  const exportPricingCsv = () => downloadCsv(buildPricingCsv(), `pricing-${dateFrom}-to-${dateTo}.csv`);
+
+  const buildPaymentBreakdownCsv = () => {
+    if (!pmData.length) return '';
+    const total = pmData.reduce((s, p) => s + p.value, 0);
+    const rows = pmData.map((p) => [
+      p.name,
+      p.value.toFixed(2),
+      total > 0 ? ((p.value / total) * 100).toFixed(1) + '%' : '0.0%',
+    ]);
+    return [['Payment Method', 'Revenue', 'Share'], ...rows].map((r) => r.join(',')).join('\n');
+  };
+  const exportPaymentBreakdownCsv = () => downloadCsv(buildPaymentBreakdownCsv(), `payment-breakdown-${dateFrom}-to-${dateTo}.csv`);
+
+  const buildExpensesCsv = () => {
+    if (!expensesByCategory.length) return '';
+    const rows = expensesByCategory.map((c) => [
+      c.category,
+      c.count,
+      c.total.toFixed(2),
+      periodExpenses > 0 ? ((c.total / periodExpenses) * 100).toFixed(1) + '%' : '0.0%',
+    ]);
+    return [['Category', 'Count', 'Total', 'Share'], ...rows].map((r) => r.join(',')).join('\n');
+  };
+  const exportExpensesCsv = () => downloadCsv(buildExpensesCsv(), `expenses-${dateFrom}-to-${dateTo}.csv`);
+
   const printReport = () => {
     window.print();
   };
@@ -549,13 +730,18 @@ export default function ReportsPage() {
         </ReportKpiGrid>
 
         <div className="rounded-2xl border border-slate-100 bg-white shadow-sm overflow-hidden dark:border-slate-800 dark:bg-slate-900/80">
-          <div className="px-4 md:px-5 pt-1 border-b border-slate-50 dark:border-slate-800/80">
+          <div className="px-2.5 md:px-3 py-2 border-b border-slate-100 bg-slate-50/50 dark:border-slate-800/80 dark:bg-slate-900/40">
             <ReportTabBar
               tabs={[
-                { id: 'overview', label: t('reports.tabOverview') },
-                { id: 'sales', label: t('reports.tabSales') },
-                { id: 'products', label: t('reports.tabProducts') },
-                { id: 'pricing', label: 'Pricing' },
+                { id: 'overview', label: t('reports.tabOverview'), icon: LayoutDashboard },
+                { id: 'sales', label: t('reports.tabSales'), icon: ShoppingCart },
+                { id: 'products', label: t('reports.tabProducts'), icon: Package },
+                { id: 'pricing', label: 'Pricing', icon: Tag },
+                { id: 'price-history', label: 'Price History', icon: History },
+                { id: 'stock-value', label: 'Stock Value', icon: Boxes },
+                { id: 'expenses', label: 'Expenses', icon: Receipt },
+                { id: 'purchases', label: 'Purchases', icon: Truck },
+                { id: 'payment-accounts', label: 'Payment Accounts', icon: Wallet },
               ]}
               active={activeTab}
               onChange={setActiveTab}
@@ -563,10 +749,27 @@ export default function ReportsPage() {
           </div>
 
           <div className="p-3 md:p-4">
-            {activeTab === 'overview' && <ReportsChartsPanel {...chartProps} />}
+            {activeTab === 'overview' && (
+              <div className="space-y-3">
+                <div className="flex justify-end">
+                  <TabExportButton
+                    onClick={exportPaymentBreakdownCsv}
+                    disabled={!pmData.length}
+                    label="Export payment breakdown (CSV)"
+                  />
+                </div>
+                <ReportsChartsPanel {...chartProps} />
+              </div>
+            )}
 
             {activeTab === 'sales' && (
-              <ReportTableShell className="border-0 shadow-none rounded-xl">
+              <div className="space-y-4">
+                <SalesInsights dailyData={dailyData} pmData={pmData} fmtC={fmtC} />
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Sales transactions</h3>
+                  <TabExportButton onClick={exportCSV} disabled={!salesReport?.length} />
+                </div>
+                <ReportTableShell className="border-0 shadow-none rounded-xl">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800">
@@ -620,10 +823,17 @@ export default function ReportsPage() {
                   </tbody>
                 </table>
               </ReportTableShell>
+              </div>
             )}
 
             {activeTab === 'products' && (
-              <ReportTableShell className="border-0 shadow-none rounded-xl">
+              <div className="space-y-4">
+                <ProductsInsights productReport={productReport} fmtC={fmtC} />
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Product performance</h3>
+                  <TabExportButton onClick={exportProductsCsv} disabled={!productReport?.length} />
+                </div>
+                <ReportTableShell className="border-0 shadow-none rounded-xl">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800">
@@ -682,10 +892,17 @@ export default function ReportsPage() {
                   </tbody>
                 </table>
               </ReportTableShell>
+              </div>
             )}
 
             {activeTab === 'pricing' && (
-              <ReportTableShell className="border-0 shadow-none rounded-xl">
+              <div className="space-y-4">
+                <PricingInsights tierBreakdown={tierBreakdown} fmt={fmt} fmtC={fmtC} />
+                <div className="flex items-center justify-between gap-3">
+                  <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Price level breakdown</h3>
+                  <TabExportButton onClick={exportPricingCsv} disabled={!saleLineExport.length} />
+                </div>
+                <ReportTableShell className="border-0 shadow-none rounded-xl">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-slate-100 dark:border-slate-800">
@@ -741,6 +958,174 @@ export default function ReportsPage() {
                   again here if it was manually overridden at checkout.
                 </p>
               </ReportTableShell>
+              </div>
+            )}
+
+            {activeTab === 'price-history' && (
+              <div className="space-y-4">
+                <PriceHistoryInsights priceHistory={priceHistory} fmtC={fmtC} />
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-200">Price changes</h3>
+                    <p className="text-xs text-slate-500">
+                      Every time a product&apos;s cost (from purchases) or listed price (retail/wholesale/VIP) changes, it shows up here.
+                    </p>
+                  </div>
+                  <TabExportButton onClick={exportPriceHistoryCsv} disabled={!priceHistory.length} />
+                </div>
+                <ReportTableShell className="border-0 shadow-none rounded-xl">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-100 dark:border-slate-800">
+                      <th className={reportTableHead}>Product</th>
+                      <th className={reportTableHead}>Type</th>
+                      <th className={reportTableHeadRight}>Old Price</th>
+                      <th className={reportTableHeadRight}>New Price</th>
+                      <th className={cn(reportTableHeadRight, 'hidden sm:table-cell')}>Change</th>
+                      <th className={cn(reportTableHead, 'hidden sm:table-cell')}>Date</th>
+                      <th className={cn(reportTableHead, 'hidden md:table-cell')}>Source</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-50 dark:divide-slate-800">
+                    {priceHistory.map((r) => {
+                      const change = r.newPrice - r.oldPrice;
+                      return (
+                        <tr key={r.id} className="hover:bg-slate-50/80 transition-colors dark:hover:bg-slate-800/50">
+                          <td className="px-4 py-2.5 font-medium text-slate-900 dark:text-slate-200">{r.product}</td>
+                          <td className="px-4 py-2.5">
+                            <span
+                              className={cn(
+                                'text-[10px] font-semibold px-2 py-0.5 rounded-full',
+                                r.type === 'Cost'
+                                  ? 'bg-slate-100 text-slate-600'
+                                  : 'bg-violet-50 text-violet-600',
+                              )}
+                            >
+                              {r.type}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2.5 text-right text-slate-500 tabular-nums">{fmtC(r.oldPrice)}</td>
+                          <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{fmtC(r.newPrice)}</td>
+                          <td
+                            className={cn(
+                              'px-4 py-2.5 text-right hidden sm:table-cell tabular-nums font-medium',
+                              change >= 0 ? 'text-emerald-600' : 'text-red-600',
+                            )}
+                          >
+                            {change >= 0 ? '+' : ''}{fmtC(change)}
+                          </td>
+                          <td className="px-4 py-2.5 text-slate-500 hidden sm:table-cell">
+                            {format(new Date(r.date), 'MMM d, yyyy')}
+                          </td>
+                          <td className="px-4 py-2.5 text-slate-500 hidden md:table-cell">{r.source}</td>
+                        </tr>
+                      );
+                    })}
+                    {!priceHistory.length && (
+                      <tr>
+                        <td colSpan={7} className="text-center py-12 text-slate-400">
+                          No price changes in this period
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </ReportTableShell>
+              </div>
+            )}
+
+            {activeTab === 'stock-value' && <StockValueTab />}
+
+            {activeTab === 'purchases' && <PurchasesTab />}
+
+            {activeTab === 'payment-accounts' && <PaymentAccountsTab />}
+
+            {activeTab === 'expenses' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-3">
+                  <ReportKpiGrid>
+                    <ReportKpiCard
+                      label="Total Expenses"
+                      value={fmtC(periodExpenses)}
+                      icon={Receipt}
+                      accent="rose"
+                      sparkline={expensesTrend.map((d) => d.total)}
+                    />
+                  </ReportKpiGrid>
+                  <TabExportButton onClick={exportExpensesCsv} disabled={!expensesByCategory.length} />
+                </div>
+
+                <ExpensesInsights
+                  expensesByCategory={expensesByCategory}
+                  expensesTrend={expensesTrend}
+                  fmtC={fmtC}
+                />
+
+                <ReportTableShell className="border-0 shadow-none rounded-xl p-4">
+                  <h3 className="text-sm font-semibold text-slate-700 mb-3">By category</h3>
+                  {expensesByCategory.length === 0 ? (
+                    <p className="text-sm text-slate-400 text-center py-8">No expenses in this period</p>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {expensesByCategory.map((c, i) => {
+                        const pct = periodExpenses > 0 ? (c.total / periodExpenses) * 100 : 0;
+                        const color = expenseCategoryColor(c.category, i);
+                        return (
+                          <div key={c.category} className="flex items-center gap-3">
+                            <span className="w-28 shrink-0 text-xs font-medium text-slate-600 truncate">
+                              {c.category}
+                            </span>
+                            <div className="flex-1 h-5 rounded-full bg-slate-100 overflow-hidden">
+                              <div
+                                className="h-full rounded-full"
+                                style={{ width: `${Math.max(pct, 2)}%`, backgroundColor: color }}
+                              />
+                            </div>
+                            <span className="w-24 shrink-0 text-right text-xs font-semibold tabular-nums text-slate-700">
+                              {fmtC(c.total)}
+                            </span>
+                            <span className="w-12 shrink-0 text-right text-[11px] text-slate-400 tabular-nums">
+                              {pct.toFixed(0)}%
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </ReportTableShell>
+
+                <ReportTableShell className="border-0 shadow-none rounded-xl">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-slate-100">
+                        <th className={reportTableHead}>Category</th>
+                        <th className={reportTableHeadRight}>Count</th>
+                        <th className={reportTableHeadRight}>Total</th>
+                        <th className={cn(reportTableHeadRight, 'hidden sm:table-cell')}>Share</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                      {expensesByCategory.map((c) => (
+                        <tr key={c.category} className="hover:bg-slate-50/80 transition-colors">
+                          <td className="px-4 py-2.5 font-medium text-slate-900">{c.category}</td>
+                          <td className="px-4 py-2.5 text-right text-slate-500 tabular-nums">{fmt(c.count)}</td>
+                          <td className="px-4 py-2.5 text-right font-semibold tabular-nums">{fmtC(c.total)}</td>
+                          <td className="px-4 py-2.5 text-right text-slate-500 hidden sm:table-cell tabular-nums">
+                            {periodExpenses > 0 ? ((c.total / periodExpenses) * 100).toFixed(1) : '0.0'}%
+                          </td>
+                        </tr>
+                      ))}
+                      {!expensesByCategory.length && (
+                        <tr>
+                          <td colSpan={4} className="text-center py-12 text-slate-400">
+                            No expenses in this period
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+                </ReportTableShell>
+              </div>
             )}
           </div>
         </div>

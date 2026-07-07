@@ -22,7 +22,7 @@ import { btnOutline, inputSoft, tableHead } from '@/lib/ui-classes';
 import { cn } from '@/lib/utils';
 import { format } from 'date-fns';
 import { TransactionDetailSheet, type TransactionRow } from '@/components/transactions/TransactionDetailSheet';
-import { CashMovementModal } from '@/components/accounting/CashMovementModal';
+import { CashMovementModal } from '@/components/transactions/CashMovementModal';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 
 const TYPE_CLASS: Record<string, { className: string; icon: typeof Receipt }> = {
@@ -55,7 +55,7 @@ const STATUS_COLORS: Record<string, string> = {
 const TYPE_ROUTES: Record<string, (id: string) => string> = {
   sale: (id) => `/dashboard/sales-history?sale=${id}`,
   purchase: (id) => `/dashboard/purchase-history?po=${id}`,
-  expense: (id) => `/dashboard/accounting?tab=expenses&expense=${id}`,
+  expense: (id) => `/dashboard/expenses?expense=${id}`,
 };
 
 const PAYMENT_LABELS: Record<string, string> = {

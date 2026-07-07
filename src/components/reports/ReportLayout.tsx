@@ -1,6 +1,6 @@
 'use client';
 
-import { memo, useState } from 'react';
+import { memo } from 'react';
 import Link from 'next/link';
 import {
   ArrowDownRight,
@@ -187,7 +187,7 @@ export function ReportTabBar({
   onChange,
   className,
 }: {
-  tabs: { id: string; label: string }[];
+  tabs: { id: string; label: string; icon?: React.ElementType }[];
   active: string;
   onChange: (id: string) => void;
   className?: string;
@@ -195,25 +195,36 @@ export function ReportTabBar({
   return (
     <div
       className={cn(
-        'flex gap-1 overflow-x-auto border-b border-slate-100 pb-px dark:border-slate-800',
+        'flex items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden',
         className,
       )}
     >
-      {tabs.map(({ id, label }) => (
-        <button
-          key={id}
-          type="button"
-          onClick={() => onChange(id)}
-          className={cn(
-            'relative shrink-0 px-4 py-2.5 text-sm font-medium transition-colors whitespace-nowrap border-b-2 -mb-px',
-            active === id
-              ? 'border-blue-600 text-blue-600 dark:border-teal-400 dark:text-teal-400'
-              : 'border-transparent text-slate-500 hover:text-slate-800 dark:text-slate-400 dark:hover:text-slate-200',
-          )}
-        >
-          {label}
-        </button>
-      ))}
+      {tabs.map(({ id, label, icon: Icon }) => {
+        const isActive = active === id;
+        return (
+          <button
+            key={id}
+            type="button"
+            onClick={() => onChange(id)}
+            className={cn(
+              'group relative inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 py-2 text-sm font-medium whitespace-nowrap transition-all duration-200',
+              isActive
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm shadow-blue-600/25 dark:from-teal-600 dark:to-emerald-600 dark:shadow-teal-600/20'
+                : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-200',
+            )}
+          >
+            {Icon && (
+              <Icon
+                className={cn(
+                  'h-4 w-4 shrink-0 transition-colors',
+                  isActive ? 'text-white' : 'text-slate-400 group-hover:text-slate-600 dark:group-hover:text-slate-300',
+                )}
+              />
+            )}
+            {label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -307,53 +318,59 @@ export const ReportKpiCard = memo(function ReportKpiCard({
 }) {
   const styles = KPI_ACCENTS[accent];
 
+  const hasSpark = !!(sparkline && sparkline.length > 1);
+
   return (
     <div
       className={cn(
-        'group relative flex h-full min-h-[132px] flex-col rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm',
+        'group relative flex h-full flex-col rounded-2xl border border-slate-100 bg-white p-3.5 shadow-sm',
         'transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
         'dark:border-slate-800 dark:bg-slate-900/80',
         styles.border,
       )}
     >
-      <div className="flex items-start justify-between gap-2 mb-2">
-        <div className={cn('flex h-8 w-8 items-center justify-center rounded-lg shrink-0', styles.icon)}>
-          <Icon className="h-4 w-4" />
+      {/* Label on TOP, icon to its right */}
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 truncate dark:text-slate-400">
+          {label}
+        </p>
+        <div className={cn('flex h-7 w-7 items-center justify-center rounded-lg shrink-0', styles.icon)}>
+          <Icon className="h-3.5 w-3.5" />
         </div>
-        {delta !== undefined && (
-          <span
-            className={cn(
-              'flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[10px] font-bold',
-              delta >= 0
-                ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400'
-                : 'bg-red-50 text-red-500 dark:bg-red-950/40 dark:text-red-400',
-            )}
-          >
-            {delta >= 0 ? (
-              <ArrowUpRight className="h-3 w-3" />
-            ) : (
-              <ArrowDownRight className="h-3 w-3" />
-            )}
-            {Math.abs(delta)}%
-          </span>
-        )}
       </div>
 
       {loading ? (
-        <div className="h-7 w-24 rounded-lg bg-slate-100 animate-pulse dark:bg-slate-800" />
+        <div className="mt-2 h-7 w-24 rounded-lg bg-slate-100 animate-pulse dark:bg-slate-800" />
       ) : (
-        <p className="text-lg lg:text-xl font-bold text-slate-900 tracking-tight tabular-nums truncate dark:text-white">
+        <p className="mt-1.5 text-xl font-bold text-slate-900 tracking-tight tabular-nums truncate dark:text-white">
           {value}
         </p>
       )}
-      <p className="text-[11px] font-medium text-slate-500 mt-0.5 truncate dark:text-slate-400">{label}</p>
-      {sub && <p className="text-[10px] text-slate-400 mt-0.5 truncate dark:text-slate-500">{sub}</p>}
 
-      <div className="mt-auto pt-2 min-h-[26px]">
-        {sparkline && sparkline.length > 1 && (
-          <MiniSparkline data={sparkline} color={styles.spark} />
-        )}
-      </div>
+      {(sub || delta !== undefined) && (
+        <div className="mt-1 flex items-center gap-2 min-w-0">
+          {delta !== undefined && (
+            <span
+              className={cn(
+                'flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px] font-bold shrink-0',
+                delta >= 0
+                  ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400'
+                  : 'bg-red-50 text-red-500 dark:bg-red-950/40 dark:text-red-400',
+              )}
+            >
+              {delta >= 0 ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
+              {Math.abs(delta)}%
+            </span>
+          )}
+          {sub && <p className="text-[10px] text-slate-400 truncate dark:text-slate-500">{sub}</p>}
+        </div>
+      )}
+
+      {hasSpark && (
+        <div className="mt-auto pt-2">
+          <MiniSparkline data={sparkline!} color={styles.spark} />
+        </div>
+      )}
     </div>
   );
 });

@@ -96,6 +96,26 @@ export interface DebtSummary {
   topDebtors: { name: string; balance: number }[];
 }
 
+export interface MonthPurchasesSummary {
+  total: number;
+  count: number;
+}
+
+export interface CostChangeRow {
+  productName: string;
+  oldCost: number;
+  newCost: number;
+  date: string;
+}
+
+export interface PriceChangeRow {
+  productName: string;
+  priceType: string;
+  oldPrice: number;
+  newPrice: number;
+  date: string;
+}
+
 export interface StoreIntelligence {
   briefing: DailyBriefing;
   health: BusinessHealth;
@@ -109,6 +129,9 @@ export interface StoreIntelligence {
   lowStockProducts: LowStockRow[];
   recentPurchases: RecentPurchaseRow[];
   debtSummary: DebtSummary;
+  monthPurchases: MonthPurchasesSummary;
+  recentCostChanges: CostChangeRow[];
+  recentPriceChanges: PriceChangeRow[];
   metrics: {
     monthRevenue: number;
     monthProfit: number;

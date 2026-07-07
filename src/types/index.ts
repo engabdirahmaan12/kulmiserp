@@ -522,6 +522,7 @@ export interface StorePaymentMethod {
   account_number?: string | null;
   account_name?: string | null;
   description?: string | null;
+  category?: 'cash' | 'mobile' | 'other';
   is_active: boolean;
   is_system: boolean;
   sort_order: number;
@@ -663,6 +664,18 @@ export interface ProductCostHistory {
   created_by?: string;
   created_at: string;
   supplier?: { name: string } | null;
+}
+
+export interface ProductSellingPriceHistory {
+  id: string;
+  store_id: string;
+  product_id: string;
+  price_type: 'retail' | 'wholesale' | 'distributor' | 'vip';
+  old_price: number;
+  new_price: number;
+  changed_by?: string;
+  notes?: string;
+  created_at: string;
 }
 
 export interface Employee {

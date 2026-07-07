@@ -21,6 +21,8 @@ interface PosState {
   // Cart
   items: CartItem[];
   customer: Customer | null;
+  /** Retail/Wholesale (etc.) chosen by the cashier for the whole cart. */
+  cart_tier: PriceTier;
   discount_amount: number;
   discount_type: 'fixed' | 'percentage';
   notes: string;
@@ -53,6 +55,7 @@ interface PosState {
   ) => void;
   replaceCartLine: (oldLineKey: string, newItem: CartItem) => void;
   repriceCartForTier: (products: Product[], tier: PriceTier) => void;
+  setCartTier: (tier: PriceTier, products: Product[]) => void;
   syncStockLimits: (products: Product[]) => void;
   setCustomer: (customer: Customer | null) => void;
   setDiscount: (amount: number, type: 'fixed' | 'percentage') => void;
@@ -113,6 +116,7 @@ export const usePosStore = create<PosState>()(
     (set, get) => ({
       items: [],
       customer: null,
+      cart_tier: 'retail',
       discount_amount: 0,
       discount_type: 'fixed',
       notes: '',
@@ -240,6 +244,11 @@ export const usePosStore = create<PosState>()(
         if (changed) set({ items: next });
       },
 
+      setCartTier: (tier, products) => {
+        set({ cart_tier: tier });
+        get().repriceCartForTier(products, tier);
+      },
+
       syncStockLimits: (products) => {
         const current = get().items;
         const next = refreshCartStockLimits(current, products);
@@ -260,6 +269,7 @@ export const usePosStore = create<PosState>()(
         set({
           items: [],
           customer: null,
+          cart_tier: 'retail',
           discount_amount: 0,
           discount_type: 'fixed',
           notes: '',

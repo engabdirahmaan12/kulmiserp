@@ -6,6 +6,7 @@ import {
 } from '@/components/ui/select';
 import type { Product } from '@/types';
 import { getSaleUnitsForProduct } from '@/lib/units/engine';
+import { isGenericPieceUnit } from '@/lib/invoice-utils';
 import { toSelectItems } from '@/lib/ui/select-utils';
 import { cn } from '@/lib/utils';
 
@@ -36,7 +37,11 @@ export function InvoiceLineUnitSelect({
   );
 
   if (units.length <= 1) {
-    const code = units[0]?.unit_type?.code ?? product.unit ?? 'PCS';
+    const code = units[0]?.unit_type?.code ?? product.unit;
+    // Simple / single-piece products carry no meaningful unit — show a dash.
+    if (isGenericPieceUnit(code)) {
+      return <span className={cn('text-[10px] text-slate-400', className)}>—</span>;
+    }
     return (
       <span className={cn('text-[10px] font-medium text-slate-500 uppercase', className)}>
         {code}

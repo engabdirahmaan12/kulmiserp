@@ -238,6 +238,8 @@ export function ProductFormModal({ open, product, onClose }: ProductFormModalPro
   const [pendingGallery, setPendingGallery] = useState<PendingGalleryItem[]>([]);
   const [deletedGalleryIds, setDeletedGalleryIds] = useState<string[]>([]);
   const [unitsForm, setUnitsForm] = useState<ProductUnitsFormState>(() => defaultProductUnitsState([]));
+  // Simple = just a name + price, no unit picker (sold as 1 base unit). Multiple = KG/Sack/etc.
+  const [simpleMode, setSimpleMode] = useState(true);
 
   const { data: categories = [] } = useQuery({
     queryKey: ['categories', currentStore?.id],
@@ -377,9 +379,17 @@ export function ProductFormModal({ open, product, onClose }: ProductFormModalPro
     unitsSyncedRef.current = unitsKey;
 
     if (product) {
-      setUnitsForm(buildUnitsFormFromProduct(product, unitTypes, existingProductUnits));
+      const built = buildUnitsFormFromProduct(product, unitTypes, existingProductUnits);
+      setUnitsForm(built);
+      // Auto-open in Simple mode only when the product truly is a single-unit item.
+      const isSimple =
+        built.sale_units.length === 0
+        && (!built.purchase_unit_id || built.purchase_unit_id === built.base_unit_id)
+        && (Number(built.purchase_conversion) || 1) === 1;
+      setSimpleMode(isSimple);
     } else {
       setUnitsForm(defaultProductUnitsState(unitTypes));
+      setSimpleMode(true);
     }
   }, [open, productId, product, unitTypes, existingProductUnits, productUnitsFetched]);
 
@@ -390,6 +400,18 @@ export function ProductFormModal({ open, product, onClose }: ProductFormModalPro
   const salesMode = watch('sales_mode') as ProductSalesMode;
   const baseUnitType = unitTypes.find((u) => u.id === unitsForm.base_unit_id);
   const stockStep = baseUnitType?.allows_decimal ? '0.001' : '1';
+
+  // Switch to Simple: collapse to a single base unit (name + price, no unit picker).
+  const enableSimpleMode = () => {
+    setSimpleMode(true);
+    setUnitsForm((f) => ({
+      ...f,
+      sale_units: [],
+      purchase_unit_id: f.base_unit_id,
+      purchase_conversion: 1,
+    }));
+    setValue('sales_mode', 'both');
+  };
 
   const { mutate, isPending } = useMutation({
     mutationFn: async (data: ProductForm) => {
@@ -707,23 +729,26 @@ export function ProductFormModal({ open, product, onClose }: ProductFormModalPro
 
             {/* Product type & status */}
             <div className="grid gap-4 sm:grid-cols-2">
-              <OutlinedField label="Product type">
-                <Select
-                  value={salesMode}
-                  onValueChange={(v) => setValue('sales_mode', (v ?? 'both') as ProductSalesMode)}
-                >
-                  <SelectTrigger className={cn(fieldInputClass, 'w-full')}>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(Object.keys(PRODUCT_SALES_MODE_LABELS) as ProductSalesMode[]).map((mode) => (
-                      <SelectItem key={mode} value={mode} label={PRODUCT_SALES_MODE_LABELS[mode]}>
-                        {PRODUCT_SALES_MODE_LABELS[mode]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </OutlinedField>
+              {/* Product type constrains price tiers — only relevant for multi-unit products. */}
+              {!simpleMode && (
+                <OutlinedField label="Product type">
+                  <Select
+                    value={salesMode}
+                    onValueChange={(v) => setValue('sales_mode', (v ?? 'both') as ProductSalesMode)}
+                  >
+                    <SelectTrigger className={cn(fieldInputClass, 'w-full')}>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(Object.keys(PRODUCT_SALES_MODE_LABELS) as ProductSalesMode[]).map((mode) => (
+                        <SelectItem key={mode} value={mode} label={PRODUCT_SALES_MODE_LABELS[mode]}>
+                          {PRODUCT_SALES_MODE_LABELS[mode]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </OutlinedField>
+              )}
               <div className="flex flex-col justify-center gap-3 rounded-xl border border-slate-200 bg-slate-50/60 px-4 py-3">
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -791,13 +816,76 @@ export function ProductFormModal({ open, product, onClose }: ProductFormModalPro
 
             {/* Units & pricing */}
             {unitTypes.length > 0 ? (
-              <ProductUnitsEditor
-                unitTypes={unitTypes}
-                value={unitsForm}
-                onChange={setUnitsForm}
-                priceLevelsEnabled={getPriceLevelsEnabled(currentStore?.settings as Record<string, unknown> | undefined)}
-                quantityPricingEnabled={getQuantityPricingEnabled(currentStore?.settings as Record<string, unknown> | undefined)}
-              />
+              <div className="space-y-3">
+                {/* Simple (name + price) vs Multiple units (KG / Sack / Carton) */}
+                <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
+                  <button
+                    type="button"
+                    onClick={enableSimpleMode}
+                    className={cn(
+                      'rounded-lg py-2 text-sm font-semibold transition-all',
+                      simpleMode ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:bg-white/60',
+                    )}
+                  >
+                    Simple (name + price)
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setSimpleMode(false)}
+                    className={cn(
+                      'rounded-lg py-2 text-sm font-semibold transition-all',
+                      !simpleMode ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:bg-white/60',
+                    )}
+                  >
+                    Multiple units
+                  </button>
+                </div>
+
+                {simpleMode ? (
+                  <div className="grid grid-cols-2 gap-4">
+                    <OutlinedField label="Cost">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={unitsForm.purchase_unit_cost || ''}
+                        onChange={(e) =>
+                          setUnitsForm((f) => ({ ...f, purchase_unit_cost: Number(e.target.value) || 0, purchase_conversion: 1 }))
+                        }
+                        className={fieldInputClass}
+                      />
+                    </OutlinedField>
+                    <OutlinedField label="Retail price" required>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={unitsForm.retail_price || ''}
+                        onChange={(e) => setUnitsForm((f) => ({ ...f, retail_price: Number(e.target.value) || 0 }))}
+                        className={fieldInputClass}
+                      />
+                    </OutlinedField>
+                    <OutlinedField label="Wholesale price (optional)" className="col-span-2">
+                      <Input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={unitsForm.wholesale_price || ''}
+                        onChange={(e) => setUnitsForm((f) => ({ ...f, wholesale_price: Number(e.target.value) || 0 }))}
+                        className={fieldInputClass}
+                      />
+                    </OutlinedField>
+                  </div>
+                ) : (
+                  <ProductUnitsEditor
+                    unitTypes={unitTypes}
+                    value={unitsForm}
+                    onChange={setUnitsForm}
+                    priceLevelsEnabled={getPriceLevelsEnabled(currentStore?.settings as Record<string, unknown> | undefined)}
+                    quantityPricingEnabled={getQuantityPricingEnabled(currentStore?.settings as Record<string, unknown> | undefined)}
+                  />
+                )}
+              </div>
             ) : (
               <div className="grid grid-cols-2 gap-4">
                 <OutlinedField label="Cost">

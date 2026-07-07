@@ -57,6 +57,9 @@ const SO = {
   slow:       /hakad\w*|aan\s+iibin/,
   purchase:   /iibsi\w*|iibso\w*/,
   supplier:   /alaab\w*\s+la\s+iibsaday/,
+  cost:       /qiimaha?\s+alaab\w*|kharashka\s+alaab\w*/,
+  priceChange: /qiimaha\s+iib\w*|isbedel\w*\s+qiim\w*|isbeddel\w*\s+qiim\w*/,
+  changed:    /isbedel\w*|isbeddel\w*|bedel\w*/,
 } as const;
 
 export function answerCopilotQuery(
@@ -140,6 +143,43 @@ export function answerCopilotQuery(
         ? (isSo ? `Iibsiyada dhawaan: ${list}.` : `Recent purchases: ${list}.`)
         : (isSo ? 'Wax dalab iibsi ah oo dhawaan ah ma jiraan.' : 'No recent purchase orders.'),
       [{ label: 'Purchases', href: '/dashboard/purchase-history' }],
+    );
+  }
+
+  if ((/purchase|spend on|spent on|bought/.test(q) && /month|mtd/.test(q)) || (SO.purchase.test(q) && SO.month.test(q))) {
+    return build(
+      isSo
+        ? `Iibsiga bishan: ${fmt(intel.monthPurchases.total)} oo ay ka mid yihiin ${intel.monthPurchases.count} dalab.`
+        : `Purchases this month: ${fmt(intel.monthPurchases.total)} across ${intel.monthPurchases.count} orders.`,
+      [{ label: 'Purchases', href: '/dashboard/reports' }],
+    );
+  }
+
+  if (/cost change|cost increase|cost went up|product cost/.test(q) || (SO.cost.test(q) && SO.changed.test(q))) {
+    const rows = intel.recentCostChanges.slice(0, 5).map((c) =>
+      isSo
+        ? `${c.productName} (${fmt(c.oldCost)} → ${fmt(c.newCost)}, ${c.date})`
+        : `${c.productName} (${fmt(c.oldCost)} → ${fmt(c.newCost)}, ${c.date})`,
+    );
+    return build(
+      rows.length
+        ? (isSo ? `Isbeddelada qiimaha alaabta (iibsi): ${rows.join('; ')}.` : `Recent product cost changes: ${rows.join('; ')}.`)
+        : (isSo ? 'Isbeddel qiimo alaab dhawaan ah lama arag.' : 'No recent product cost changes detected.'),
+      [{ label: 'Reports', href: '/dashboard/reports' }],
+    );
+  }
+
+  if (/price change|selling price|price increase|price update/.test(q) || SO.priceChange.test(q)) {
+    const rows = intel.recentPriceChanges.slice(0, 5).map((p) =>
+      isSo
+        ? `${p.productName} ${p.priceType} (${fmt(p.oldPrice)} → ${fmt(p.newPrice)}, ${p.date})`
+        : `${p.productName} ${p.priceType} (${fmt(p.oldPrice)} → ${fmt(p.newPrice)}, ${p.date})`,
+    );
+    return build(
+      rows.length
+        ? (isSo ? `Isbeddelada qiimaha iibka: ${rows.join('; ')}.` : `Recent selling price changes: ${rows.join('; ')}.`)
+        : (isSo ? 'Isbeddel qiimo iib dhawaan ah lama arag.' : 'No recent selling price changes detected.'),
+      [{ label: 'Reports', href: '/dashboard/reports' }],
     );
   }
 

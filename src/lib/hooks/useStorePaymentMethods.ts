@@ -54,7 +54,9 @@ export function methodsToPaymentOptions(methods: StorePaymentMethod[]): DynamicP
       method: m.slug as PaymentMethod,
       label: m.label,
       icon: slugToIcon(m.slug),
-      group: slugToGroup(m.slug),
+      // Prefer the user-chosen category column (migration 058); fall back to the
+      // slug heuristic for rows created before that column existed.
+      group: m.category ?? slugToGroup(m.slug),
       accountNumber: m.account_number ?? undefined,
       accountName: m.account_name ?? undefined,
     }));

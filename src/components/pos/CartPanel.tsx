@@ -25,14 +25,14 @@ export function CartPanel({ products = [] }: { products?: Product[] }) {
   const {
     items,
     customer,
+    cart_tier,
     discount_amount,
     discount_type,
     removeItem,
     updateQuantity,
-    updateLineItem,
     replaceCartLine,
-    repriceCartForTier,
     syncStockLimits,
+    setCartTier,
     setCustomer,
     setDiscount,
     clearCart,
@@ -61,11 +61,12 @@ export function CartPanel({ products = [] }: { products?: Product[] }) {
     syncStockLimits(products);
   }, [cartStockKey, productStockKey, items.length, products, syncStockLimits]);
 
+  // When a customer is assigned/cleared, pre-set the cart-level tier to their
+  // price level (walk-in → store default). The cashier can still flip it after.
   useEffect(() => {
-    if (items.length === 0 || products.length === 0) return;
     const tier = getDefaultPriceTier(customer, (currentStore?.settings ?? {}) as Record<string, unknown>);
-    repriceCartForTier(products, tier);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- reprice only when customer tier changes
+    setCartTier(tier, products);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- only when customer tier changes
   }, [customer?.id, customer?.price_tier, products.length]);
 
   const productMap = new Map(products.map((p) => [p.id, p]));
@@ -137,6 +138,35 @@ export function CartPanel({ products = [] }: { products?: Product[] }) {
           >
             {t('pos.clearAll')}
           </button>
+        )}
+      </div>
+
+      {/* Cart-level Retail / Wholesale price switch — one tap reprices the whole cart. */}
+      <div className="border-b border-slate-100 px-4 py-2.5">
+        <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1">
+          {(['retail', 'wholesale'] as const).map((tier) => {
+            const active = cart_tier === tier;
+            return (
+              <button
+                key={tier}
+                type="button"
+                onClick={() => setCartTier(tier, products)}
+                className={cn(
+                  'rounded-lg py-2 text-sm font-semibold transition-all',
+                  active
+                    ? tier === 'wholesale'
+                      ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-sm'
+                      : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm'
+                    : 'text-slate-600 hover:bg-white/70',
+                )}
+              >
+                {tier === 'retail' ? t('pos.priceRetail') : t('pos.priceWholesale')}
+              </button>
+            );
+          })}
+        </div>
+        {customer?.price_tier && customer.price_tier === cart_tier && (
+          <p className="mt-1 text-[10px] text-slate-400 text-center">{t('pos.tierFromCustomer')}</p>
         )}
       </div>
 

@@ -71,6 +71,7 @@ export async function fetchStoreIntelligence(store: Store, userName?: string, t:
     customersRes, productsRes, saleItemsRes,
     suppliersRes, recentSalesRes, recentExpRes,
     accountsRes, newCustomersRes, recentPurchasesRes,
+    monthPurchasesRes, costHistoryRes, priceHistoryRes,
   ] = await Promise.all([
     supabase.from('sales').select('total_amount, id').eq('store_id', store.id).eq('status', 'completed').gte('sale_date', today),
     supabase.from('sales').select('total_amount').eq('store_id', store.id).eq('status', 'completed').gte('sale_date', monthStart),
@@ -91,6 +92,23 @@ export async function fetchStoreIntelligence(store: Store, userName?: string, t:
       .eq('store_id', store.id)
       .order('created_at', { ascending: false })
       .limit(6),
+    supabase
+      .from('purchase_orders')
+      .select('total_amount')
+      .eq('store_id', store.id)
+      .gte('created_at', monthStart),
+    supabase
+      .from('product_cost_history')
+      .select('previous_average_cost, new_average_cost, created_at, product:products(name)')
+      .eq('store_id', store.id)
+      .order('created_at', { ascending: false })
+      .limit(10),
+    supabase
+      .from('product_selling_price_history')
+      .select('price_type, old_price, new_price, created_at, product:products(name)')
+      .eq('store_id', store.id)
+      .order('created_at', { ascending: false })
+      .limit(10),
   ]);
 
   const todaySales = (todaySalesRes.data ?? []).reduce((s, r) => s + r.total_amount, 0);
@@ -293,6 +311,35 @@ export async function fetchStoreIntelligence(store: Store, userName?: string, t:
     status: po.status ?? 'draft',
   }));
 
+  const monthPurchasesData = monthPurchasesRes.data ?? [];
+  const monthPurchases = {
+    total: monthPurchasesData.reduce((s, r) => s + (r.total_amount ?? 0), 0),
+    count: monthPurchasesData.length,
+  };
+
+  const recentCostChanges = (costHistoryRes.data ?? []).map((row) => {
+    const product = row.product as unknown as { name?: string } | { name?: string }[] | null;
+    const productName = Array.isArray(product) ? product[0]?.name : product?.name;
+    return {
+      productName: productName ?? 'Unknown',
+      oldCost: row.previous_average_cost ?? 0,
+      newCost: row.new_average_cost ?? 0,
+      date: row.created_at?.split('T')[0] ?? '',
+    };
+  });
+
+  const recentPriceChanges = (priceHistoryRes.data ?? []).map((row) => {
+    const product = row.product as unknown as { name?: string } | { name?: string }[] | null;
+    const productName = Array.isArray(product) ? product[0]?.name : product?.name;
+    return {
+      productName: productName ?? 'Unknown',
+      priceType: row.price_type ?? '',
+      oldPrice: row.old_price ?? 0,
+      newPrice: row.new_price ?? 0,
+      date: row.created_at?.split('T')[0] ?? '',
+    };
+  });
+
   const debtSummary = {
     customersWithBalance: customers.filter((c) => (c.balance ?? 0) > 0).length,
     overdueCount: alerts.filter((a) => a.type === 'overdue_debt' && a.severity === 'error').length,
@@ -316,6 +363,9 @@ export async function fetchStoreIntelligence(store: Store, userName?: string, t:
     lowStockProducts,
     recentPurchases,
     debtSummary,
+    monthPurchases,
+    recentCostChanges,
+    recentPriceChanges,
     metrics: {
       monthRevenue,
       monthProfit,

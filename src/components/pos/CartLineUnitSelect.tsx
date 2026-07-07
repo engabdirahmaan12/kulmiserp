@@ -6,6 +6,7 @@ import {
 } from '@/components/ui/select';
 import type { CartItem, Customer, Product } from '@/types';
 import { buildCartItemFromUnit, getDefaultPriceTier, getSaleUnitsForProduct } from '@/lib/pos/units';
+import { isGenericPieceUnit } from '@/lib/invoice-utils';
 import { toSelectItems } from '@/lib/ui/select-utils';
 import { cn } from '@/lib/utils';
 
@@ -40,9 +41,11 @@ export function CartLineUnitSelect({
   );
 
   if (units.length <= 1) {
+    // Simple / single-piece products carry no meaningful unit — show nothing.
+    if (isGenericPieceUnit(item.sale_unit_code)) return null;
     return (
       <span className={cn('text-[10px] font-medium text-slate-500 uppercase', className)}>
-        {item.sale_unit_code ?? 'PCS'}
+        {item.sale_unit_code}
       </span>
     );
   }

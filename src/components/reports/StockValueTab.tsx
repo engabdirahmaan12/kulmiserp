@@ -13,9 +13,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ReportTableShell, reportTableHead, reportTableHeadRight } from '@/components/reports/ReportLayout';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
-import { Layers } from 'lucide-react';
+import { Download, Layers } from 'lucide-react';
 import { costMethodLabel, COST_METHOD_OPTIONS, type InventoryCostMethod } from '@/lib/inventory/costing';
 import { toSelectItems } from '@/lib/ui/select-utils';
+import { downloadCsv, escapeCsvCell } from '@/lib/export/spreadsheet';
 import type { Product, InventoryCostLayer, Store } from '@/types';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 
@@ -67,7 +68,7 @@ function ProductCell({
   );
 }
 
-export function InventoryValuationTab() {
+export function StockValueTab() {
   const { currentStore, user, setCurrentStore } = useAuthStore();
   const { t } = useTranslation();
   const { role } = usePermission();
@@ -218,6 +219,24 @@ export function InventoryValuationTab() {
           ? 'overlay'
           : 'cost';
 
+  const exportCsv = () => {
+    const rows = productRows.map((p) => [
+      p.name,
+      p.sku ?? '',
+      p.category?.name ?? '',
+      p.brand ?? '',
+      p.stock_quantity,
+      (p.cost_price || 0).toFixed(2),
+      p.avgValue.toFixed(2),
+      p.fifoValue.toFixed(2),
+    ]);
+    const csv = [
+      ['Product', 'SKU', 'Category', 'Brand', 'Qty', 'Avg Cost', 'Avg Value', 'FIFO Value'],
+      ...rows,
+    ].map((r) => r.map(escapeCsvCell).join(',')).join('\n');
+    downloadCsv(csv, `stock-value-${new Date().toISOString().split('T')[0]}.csv`);
+  };
+
   if (loadingProducts || loadingLayers) return <Skeleton className="h-48 rounded-2xl" />;
 
   const activeCol =
@@ -257,7 +276,7 @@ export function InventoryValuationTab() {
             value={costMethod}
             items={methodItems}
             onValueChange={(v) => v && updateMethod(v as InventoryCostMethod)}
-            disabled={isPending}
+            disabled={isPending || !canBackfill}
           >
             <SelectTrigger className="w-44 h-8 text-xs">
               <SelectValue />
@@ -269,6 +288,15 @@ export function InventoryValuationTab() {
             </SelectContent>
           </Select>
           <Badge className="bg-violet-50 text-violet-700">{costMethodLabel(costMethod)}</Badge>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 rounded-full text-xs"
+            disabled={!productRows.length}
+            onClick={exportCsv}
+          >
+            <Download className="h-3.5 w-3.5 mr-1.5" /> Export CSV
+          </Button>
         </div>
       </div>
 
@@ -288,20 +316,14 @@ export function InventoryValuationTab() {
             'rounded-xl border p-4',
             gapCard.warn
               ? 'border-amber-200 bg-amber-50/60 dark:border-amber-900/50 dark:bg-amber-950/20'
-              : gapKind === 'cost'
-                ? 'border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/50'
-                : 'border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/50',
+              : 'border-slate-200 bg-slate-50/50 dark:border-slate-800 dark:bg-slate-900/50',
           )}
         >
           <p className="text-[10px] text-slate-500 uppercase tracking-wide font-medium">{gapCard.label}</p>
           <p
             className={cn(
               'text-xl font-bold tabular-nums mt-0.5',
-              gapCard.warn
-                ? 'text-amber-800 dark:text-amber-200'
-                : gapKind === 'cost'
-                  ? 'text-slate-900 dark:text-white'
-                  : 'text-slate-900 dark:text-white',
+              gapCard.warn ? 'text-amber-800 dark:text-amber-200' : 'text-slate-900 dark:text-white',
             )}
           >
             {gapDisplay}

@@ -2,7 +2,7 @@
 
 import { Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { ExpensesTab } from '@/components/accounting/ExpensesTab';
+import { ExpensesTab } from '@/components/expenses/ExpensesTab';
 import { PageHeader } from '@/components/layout/PageHeader';
 import { PageShell, DataPanel } from '@/components/layout/PageShell';
 import { Skeleton } from '@/components/ui/skeleton';

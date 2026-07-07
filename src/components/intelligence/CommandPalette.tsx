@@ -15,7 +15,7 @@ import {
 } from '@/components/ui/command';
 import {
   ShoppingCart, Package, Users, FileText, Receipt, BarChart3,
-  Calculator, Sparkles, Bell, Truck, Settings, LayoutDashboard,
+  Sparkles, Bell, Truck, Settings, LayoutDashboard,
   ShoppingBag, History,
 } from 'lucide-react';
 import { useGlobalSearchQuery } from '@/lib/hooks/useIntelligence';
@@ -30,7 +30,6 @@ const NAV_COMMANDS = [
   { label: 'New Invoice', href: '/dashboard/custom-sales', icon: FileText },
   { label: 'Customers', href: '/dashboard/customers', icon: Users },
   { label: 'Expenses', href: '/dashboard/expenses', icon: Receipt },
-  { label: 'Financial Reports', href: '/dashboard/accounting', icon: Calculator },
   { label: 'Reports', href: '/dashboard/reports', icon: BarChart3 },
   { label: 'AI Intelligence', href: '/dashboard/intelligence', icon: Sparkles },
   { label: 'Alerts Center', href: '/dashboard/reminders', icon: Bell },

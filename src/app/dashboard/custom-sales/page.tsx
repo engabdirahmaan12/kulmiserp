@@ -42,7 +42,6 @@ import { useTranslation } from '@/lib/i18n/useTranslation';
 import {
   dbSaleItemToSaleLine,
   defaultSalePriceForProduct,
-  getEffectivePriceTier,
   lineBaseQty,
   pickDefaultSaleUnit,
   repriceSaleLineUnit,
@@ -53,6 +52,7 @@ import {
 import type { PriceTier } from '@/lib/units/conversion';
 import { getPosAllowPriceOverride } from '@/lib/pos/pricing';
 import { usePermission } from '@/lib/hooks/usePermission';
+import { useStorePaymentMethods } from '@/lib/hooks/useStorePaymentMethods';
 import { InvoiceLineUnitSelect } from '@/components/sales/InvoiceLineUnitSelect';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -132,7 +132,7 @@ function fmtCurrency(amount: number, currency = 'USD') {
   }).format(amount);
 }
 
-const PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
+const DEFAULT_PAYMENT_METHODS: { value: PaymentMethod; label: string }[] = [
   { value: 'cash', label: 'Cash' },
   { value: 'waafi', label: 'WAAFI' },
   { value: 'evc', label: 'EVC' },
@@ -331,13 +331,12 @@ interface ProductSearchCellProps {
   item: LineItem;
   products: ProductRow[];
   storeDefaultTax: number;
-  customer: Customer | null;
-  storeSettings: Record<string, unknown>;
+  tier: PriceTier;
   onChange: (id: string, patch: Partial<LineItem>) => void;
   onOpenQuickAdd: () => void;
 }
 
-function ProductSearchCell({ item, products, storeDefaultTax, customer, storeSettings, onChange, onOpenQuickAdd }: ProductSearchCellProps) {
+function ProductSearchCell({ item, products, storeDefaultTax, tier, onChange, onOpenQuickAdd }: ProductSearchCellProps) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [open, setOpen] = useState(false);
@@ -358,7 +357,6 @@ function ProductSearchCell({ item, products, storeDefaultTax, customer, storeSet
   }, [products, search]);
 
   const selectProduct = (p: ProductRow) => {
-    const tier = getEffectivePriceTier(p, customer, storeSettings);
     const defaultUnit = pickDefaultSaleUnit(p);
     let unitPrice = defaultSalePriceForProduct(p, tier);
     let discountPct = 0;
@@ -454,7 +452,7 @@ function ProductSearchCell({ item, products, storeDefaultTax, customer, storeSet
                         </>
                       ) : (
                         <span className="text-xs font-semibold text-teal-600">
-                          {fmtCurrency(defaultSalePriceForProduct(p, getEffectivePriceTier(p, customer, storeSettings)))}
+                          {fmtCurrency(defaultSalePriceForProduct(p, tier))}
                         </span>
                       )}
                     </div>
@@ -615,6 +613,7 @@ export default function CustomSalesPage() {
   const [showCustomerDropdown, setShowCustomerDropdown] = useState(false);
   const [saleDate, setSaleDate] = useState(new Date().toISOString().split('T')[0]);
   const [items, setItems] = useState<LineItem[]>([newLineItem()]);
+  const [cartTier, setCartTier] = useState<PriceTier>('retail');
   const [notes, setNotes] = useState('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
   const [paymentMode, setPaymentMode] = useState<'full' | 'partial' | 'credit'>('full');
@@ -635,6 +634,19 @@ export default function CustomSalesPage() {
     enabled: !!currentStore,
     staleTime: 60_000,
   });
+
+  const { data: storePaymentMethods = [] } = useStorePaymentMethods();
+  const paymentMethods = useMemo(() => {
+    const dynamic = storePaymentMethods
+      .filter((m) => m.slug !== 'customer_deposit')
+      .map((m) => ({ value: m.slug as PaymentMethod, label: m.label }));
+    const seen = new Set(dynamic.map((m) => m.value));
+    const merged = [...dynamic];
+    for (const m of DEFAULT_PAYMENT_METHODS) {
+      if (!seen.has(m.value)) merged.push(m);
+    }
+    return merged;
+  }, [storePaymentMethods]);
 
   const productMap = useMemo(() => new Map(products.map((p) => [p.id, p])), [products]);
 
@@ -786,6 +798,47 @@ export default function CustomSalesPage() {
     );
   }, [productMap]);
 
+  // Cart-level Retail/Wholesale switch — one tap reprices every product line.
+  const changeCartTier = (tier: PriceTier) => {
+    setCartTier(tier);
+    setItems((prev) =>
+      prev.map((it) => {
+        if (!it.product_id) return { ...it, price_tier: tier };
+        const product = productMap.get(it.product_id);
+        if (!product) return { ...it, price_tier: tier };
+        const gross = it.unit_price * it.quantity;
+        const discountAmt = gross * (it.discount_pct / 100);
+        const repriced = repriceSaleLineUnit(
+          product,
+          { sale_unit_id: it.sale_unit_id ?? null, sale_unit_qty: it.quantity, discount_amount: discountAmt, price_tier: tier },
+          tier,
+        );
+        if (!repriced) return { ...it, price_tier: tier };
+        return {
+          ...it,
+          price_tier: tier,
+          unit_price: repriced.unit_price ?? it.unit_price,
+          cost_price: repriced.cost_price ?? it.cost_price,
+          sale_unit_code: repriced.sale_unit_code ?? it.sale_unit_code,
+          conversion_factor: repriced.conversion_factor ?? it.conversion_factor,
+          base_qty: repriced.base_qty ?? it.base_qty,
+          original_unit_price: null,
+          price_override_reason: null,
+        };
+      }),
+    );
+  };
+
+  // Select/clear a customer and pre-set the tier from their price level (new lines use it).
+  const applyCustomer = (c: Customer | null) => {
+    setSelectedCustomer(c);
+    const tier =
+      (c?.price_tier as PriceTier)
+      ?? ((currentStore?.settings as Record<string, unknown>)?.default_price_tier as PriceTier)
+      ?? 'retail';
+    setCartTier(tier);
+  };
+
   const removeItem = useCallback((id: string) => {
     setItems((prev) => (prev.length > 1 ? prev.filter((it) => it.id !== id) : prev));
   }, []);
@@ -877,7 +930,7 @@ export default function CustomSalesPage() {
                       <p className="text-sm font-medium text-slate-900 truncate">{selectedCustomer.full_name}</p>
                       {selectedCustomer.phone && <p className="text-xs text-slate-400">{selectedCustomer.phone}</p>}
                     </div>
-                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => setSelectedCustomer(null)}>
+                    <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" onClick={() => applyCustomer(null)}>
                       <Trash2 className="h-3.5 w-3.5 text-slate-400" />
                     </Button>
                   </div>
@@ -899,7 +952,7 @@ export default function CustomSalesPage() {
                             key={c.id}
                             type="button"
                             className="flex w-full items-center gap-2 px-3 py-2 text-left text-sm hover:bg-slate-50 transition-colors"
-                            onMouseDown={() => { setSelectedCustomer(c); setCustomerSearch(''); setShowCustomerDropdown(false); }}
+                            onMouseDown={() => { applyCustomer(c); setCustomerSearch(''); setShowCustomerDropdown(false); }}
                           >
                             <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-bold text-blue-600">
                               {c.full_name.charAt(0).toUpperCase()}
@@ -919,6 +972,33 @@ export default function CustomSalesPage() {
               <div>
                 <Label className="text-xs text-slate-500 mb-1.5 block">{t('customSales.invoiceDate')}</Label>
                 <Input type="date" value={saleDate} onChange={(e) => setSaleDate(e.target.value)} className="h-9" />
+              </div>
+            </div>
+
+            {/* Retail / Wholesale switch — one tap reprices every product line. */}
+            <div>
+              <Label className="text-xs text-slate-500 mb-1.5 block">{t('customSales.priceLevel')}</Label>
+              <div className="grid grid-cols-2 gap-1 rounded-xl bg-slate-100 p-1 max-w-xs">
+                {(['retail', 'wholesale'] as const).map((tier) => {
+                  const active = cartTier === tier;
+                  return (
+                    <button
+                      key={tier}
+                      type="button"
+                      onClick={() => changeCartTier(tier)}
+                      className={cn(
+                        'rounded-lg py-2 text-sm font-semibold transition-all',
+                        active
+                          ? tier === 'wholesale'
+                            ? 'bg-gradient-to-r from-amber-500 to-orange-600 text-white shadow-sm'
+                            : 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-sm'
+                          : 'text-slate-600 hover:bg-white/70',
+                      )}
+                    >
+                      {tier === 'retail' ? t('pos.priceRetail') : t('pos.priceWholesale')}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           </div>
@@ -975,8 +1055,7 @@ export default function CustomSalesPage() {
                         item={item}
                         products={products}
                         storeDefaultTax={currentStore?.tax_rate ?? 0}
-                        customer={selectedCustomer}
-                        storeSettings={(currentStore?.settings ?? {}) as Record<string, unknown>}
+                        tier={cartTier}
                         onChange={updateItem}
                         onOpenQuickAdd={() => setShowQuickAdd(true)}
                       />
@@ -1179,7 +1258,7 @@ export default function CustomSalesPage() {
                   >
                     <SelectTrigger className="h-9 text-sm"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {PAYMENT_METHODS.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
+                      {paymentMethods.map((m) => <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>

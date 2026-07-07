@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Settings, Users, Store, Loader2, Plus, Trash2, Palette, FileText, Layers, Globe, ImageIcon, ShoppingCart, Building2 } from 'lucide-react';
+import { Settings, Users, Store, Loader2, Plus, Trash2, Palette, FileText, Layers, Globe, ImageIcon, ShoppingCart, Building2, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +26,7 @@ import { LanguageSettingsPanel } from '@/components/i18n/LanguageSettingsPanel';
 import { StoreBrandingPanel } from '@/components/settings/StoreBrandingPanel';
 import { PosSettingsPanel } from '@/components/settings/PosSettingsPanel';
 import { PricingConfigurationPanel } from '@/components/settings/PricingConfigurationPanel';
+import { PaymentMethodsPanel } from '@/components/settings/PaymentMethodsPanel';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 
 const storeSchema = z.object({
@@ -62,11 +63,11 @@ interface InvoiceSettingsForm {
   show_product_images: boolean;
 }
 
-type SettingsTab = 'store' | 'business' | 'invoice' | 'inventory' | 'branding' | 'language' | 'users' | 'pos';
+type SettingsTab = 'store' | 'business' | 'invoice' | 'inventory' | 'branding' | 'language' | 'users' | 'pos' | 'payments';
 
 function resolveSettingsTab(param: string | null): SettingsTab {
   if (param === 'tax' || param === 'currency') return 'store';
-  const allowed: SettingsTab[] = ['store', 'business', 'invoice', 'inventory', 'branding', 'language', 'users', 'pos'];
+  const allowed: SettingsTab[] = ['store', 'business', 'invoice', 'inventory', 'branding', 'language', 'users', 'pos', 'payments'];
   if (param && allowed.includes(param as SettingsTab)) return param as SettingsTab;
   return 'store';
 }
@@ -228,6 +229,10 @@ function SettingsPageInner() {
             <TabsTrigger value="pos" className="gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
               <ShoppingCart className="h-4 w-4" />
               POS
+            </TabsTrigger>
+            <TabsTrigger value="payments" className="gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
+              <Wallet className="h-4 w-4" />
+              Payments
             </TabsTrigger>
             <TabsTrigger value="inventory" className="gap-2 rounded-lg data-[state=active]:bg-white data-[state=active]:shadow-sm">
               <Layers className="h-4 w-4" />
@@ -403,6 +408,10 @@ function SettingsPageInner() {
 
           <TabsContent value="pos" className="mt-4">
             <PosSettingsPanel />
+          </TabsContent>
+
+          <TabsContent value="payments" className="mt-4">
+            <PaymentMethodsPanel />
           </TabsContent>
 
           <TabsContent value="inventory" className="mt-4">

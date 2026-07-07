@@ -60,7 +60,7 @@ const PAYMENT_LABELS: Record<string, string> = {
 const FULL_PAGE: Record<string, (id: string) => string> = {
   sale: (id) => `/dashboard/sales-history?sale=${id}`,
   purchase: (id) => `/dashboard/purchase-history?po=${id}`,
-  expense: (id) => `/dashboard/accounting?tab=expenses&expense=${id}`,
+  expense: (id) => `/dashboard/expenses?expense=${id}`,
 };
 
 interface TransactionDetailSheetProps {

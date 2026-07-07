@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -21,10 +21,54 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, Receipt, Loader2, ArrowLeft, Upload, Check, X, ExternalLink, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import type { Expense } from '@/types';
-import { useClosedPeriods } from '@/lib/accounting/hooks';
+import type { AccountingPeriod, Expense } from '@/types';
 import { useTranslation } from '@/lib/i18n/useTranslation';
 import { useStorePaymentMethods } from '@/lib/hooks/useStorePaymentMethods';
+
+const EXPENSE_CATEGORIES = [
+  'Rent', 'Utilities', 'Salaries', 'Marketing', 'Supplies',
+  'Transport', 'Insurance', 'Maintenance', 'Food', 'Other',
+];
+
+/** Blocks entry into a date that falls within a previously closed accounting
+ *  period (a handful of stores may have historical closed periods; there's
+ *  no UI to close new ones anymore, so this only ever matters for those). */
+function useClosedPeriods() {
+  const { currentStore } = useAuthStore();
+
+  const { data: periods = [] } = useQuery<Pick<AccountingPeriod, 'period_start' | 'period_end' | 'is_closed'>[]>({
+    queryKey: ['accounting-periods-closed', currentStore?.id],
+    queryFn: async () => {
+      const supabase = createClient();
+      const { data } = await supabase
+        .from('accounting_periods')
+        .select('period_start, period_end, is_closed')
+        .eq('store_id', currentStore!.id)
+        .eq('is_closed', true);
+      return data ?? [];
+    },
+    enabled: !!currentStore,
+    staleTime: 60_000,
+  });
+
+  const isDateClosed = useCallback(
+    (dateStr: string): string | null => {
+      if (!dateStr) return null;
+      const d = new Date(dateStr);
+      for (const p of periods) {
+        const start = new Date(p.period_start);
+        const end = new Date(p.period_end);
+        if (d >= start && d <= end) {
+          return `This date falls within a closed period (${p.period_start} – ${p.period_end}). Transactions cannot be posted into a closed period.`;
+        }
+      }
+      return null;
+    },
+    [periods],
+  );
+
+  return { isDateClosed };
+}
 
 const expenseSchema = z.object({
   description: z.string().min(1, 'Description is required'),
@@ -36,11 +80,6 @@ const expenseSchema = z.object({
 });
 
 type ExpenseForm = z.infer<typeof expenseSchema>;
-
-const EXPENSE_CATEGORIES = [
-  'Rent', 'Utilities', 'Salaries', 'Marketing', 'Supplies',
-  'Transport', 'Insurance', 'Maintenance', 'Food', 'Other',
-];
 
 const STATUS_BADGE: Record<string, string> = {
   pending: 'bg-amber-50 text-amber-700',
@@ -54,11 +93,9 @@ const PAYMENT_LABELS: Record<string, string> = {
 
 interface ExpensesTabProps {
   highlightExpenseId?: string | null;
-  /** Where expense detail URLs should point (standalone page vs accounting tab). */
-  linkMode?: 'standalone' | 'accounting';
 }
 
-export function ExpensesTab({ highlightExpenseId = null, linkMode = 'standalone' }: ExpensesTabProps) {
+export function ExpensesTab({ highlightExpenseId = null }: ExpensesTabProps) {
   const router = useRouter();
   const { t } = useTranslation();
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
@@ -120,16 +157,11 @@ export function ExpensesTab({ highlightExpenseId = null, linkMode = 'standalone'
     if (expense) setSelectedExpense(expense);
   }, [highlightExpenseId, expenseInList, linkedExpense]);
 
-  const expenseListPath =
-    linkMode === 'accounting' ? '/dashboard/accounting?tab=expenses' : '/dashboard/expenses';
+  const expenseListPath = '/dashboard/expenses';
 
   const openExpense = (expense: Expense) => {
     setSelectedExpense(expense);
-    const url =
-      linkMode === 'accounting'
-        ? `/dashboard/accounting?tab=expenses&expense=${expense.id}`
-        : `/dashboard/expenses?expense=${expense.id}`;
-    router.push(url);
+    router.push(`/dashboard/expenses?expense=${expense.id}`);
   };
 
   const closeExpenseDetail = () => {

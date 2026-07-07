@@ -2,7 +2,7 @@ import type { LucideIcon } from 'lucide-react';
 import {
   LayoutDashboard, ShoppingCart, FileText, FileClock, History,
   Package, Tag, Bookmark, Percent, ShoppingBag, ClipboardList,
-  Users, Truck, AlertCircle, Receipt, Calculator, BarChart3,
+  Users, Truck, AlertCircle, Receipt, BarChart3,
   UserCog, Settings, Sparkles, CreditCard, ArrowLeftRight,
 } from 'lucide-react';
 
@@ -59,7 +59,6 @@ export const NAV_GROUPS: NavGroupConfig[] = [
     labelKey: 'nav.groups.finance',
     items: [
       { href: '/dashboard/expenses', labelKey: 'nav.expenses', icon: Receipt, module: 'accounting' },
-      { href: '/dashboard/accounting', labelKey: 'nav.financialReports', icon: Calculator, module: 'accounting' },
       { href: '/dashboard/reports', labelKey: 'nav.reports', icon: BarChart3, module: 'reports' },
       { href: '/dashboard/transactions', labelKey: 'nav.transactions', icon: ArrowLeftRight, module: null },
     ],
@@ -83,16 +82,3 @@ export const NAVBAR_QUICK_LINKS = [
   { labelKey: 'nav.expenses', href: '/dashboard/expenses', icon: Receipt, color: 'text-red-600 bg-red-50' },
   { labelKey: 'nav.aiAssistant', href: '/dashboard/intelligence', icon: Sparkles, color: 'text-indigo-600 bg-indigo-50' },
 ] as const;
-
-/** Valid accounting tab ids for in-page navigation */
-export const ACCOUNTING_TAB_IDS = [
-  'dashboard', 'pnl', 'balance-sheet', 'cash-flow', 'trial-balance', 'ledger', 'journals',
-  'expenses', 'payments', 'transfers', 'loans', 'receivables', 'payables', 'accounts', 'payroll', 'valuation',
-  'currency', 'settings', 'periods', 'audit',
-] as const;
-
-export type AccountingTabParam = (typeof ACCOUNTING_TAB_IDS)[number];
-
-export function isAccountingTab(value: string | null): value is AccountingTabParam {
-  return value !== null && (ACCOUNTING_TAB_IDS as readonly string[]).includes(value);
-}

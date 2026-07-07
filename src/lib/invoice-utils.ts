@@ -25,10 +25,17 @@ export interface InvoiceLineItem {
   is_custom_price?: boolean;
 }
 
+/** "PCS" is the generic single-piece unit auto-assigned to simple products —
+ *  it carries no information, so it's never shown. Real units (KG, Sack,
+ *  Carton, SET…) are always shown. */
+export function isGenericPieceUnit(code: string | null | undefined): boolean {
+  return !code || code.trim().toUpperCase() === 'PCS';
+}
+
 /** Display qty with optional unit code and base-qty hint for multi-unit lines. */
 export function formatInvoiceLineQty(item: Pick<InvoiceLineItem, 'quantity' | 'unit_code' | 'base_qty'>): string {
   const qty = item.quantity;
-  if (item.unit_code) {
+  if (!isGenericPieceUnit(item.unit_code)) {
     const base = item.base_qty;
     const baseHint =
       base != null && Math.abs(base - qty) > 0.0001 ? ` (${base} base)` : '';
